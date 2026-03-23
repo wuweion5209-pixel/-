@@ -1,0 +1,19 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+aiomysql
+pydantic
+python-dotenv
+chromadb
+langchain
+qianwen-sdk
+gradio
+pdfplumber
+python-docx
+requests
+beautifulsoup4
+loguru
+python-multipart
+pytest
+
+# RAG + Agent + FastAPI project dependencies
