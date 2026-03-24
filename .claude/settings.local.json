@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python -c \"from app.main import app; print\\(''Import successful''\\)\")",
-      "Bash(python -c \"import uvicorn; print\\(''Uvicorn available''\\)\")",
-      "Bash(python -c \":*)"
-    ]
-  }
-}

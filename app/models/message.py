@@ -11,3 +11,5 @@ class Message(Base):
     role = Column(String(20))                                # 角色：user 或 assistant
     content = Column(Text)                                   # 聊天内容
     created_at = Column(DateTime, default=datetime.now)  # 发送时间
+
+    

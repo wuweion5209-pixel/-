@@ -3,17 +3,14 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-
+#如果服务状态正常，则返回running，否则返回error
 @router.get("/health")
 async def health_check():
-    """健康检查接口"""
-    return {
-        "status": "running",
-        "database": "connected"
-    }
-
-
+    try:
+        return {"status": "running"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+#根路由返回欢迎信息
 @router.get("/")
 async def root():
-    """根路由"""
     return {"message": "Welcome to my AI Agent Project"}

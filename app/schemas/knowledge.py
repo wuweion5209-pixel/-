@@ -20,3 +20,4 @@ class KnowledgeClearResponse(BaseModel):
     """知识库清空响应"""
     status: str
     deleted_count: int
+
