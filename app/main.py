@@ -1,5 +1,7 @@
 """FastAPI 应用入口"""
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.core.database import engine, Base
 from app.api.v1.routes import health_router, chat_router, knowledge_router
 from app.utils.logger import logger
@@ -11,10 +13,18 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
 # 注册路由
 app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(knowledge_router)
+
+# 托管前端静态文件
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
+@app.get("/")
+async def serve_frontend():
+    return FileResponse("frontend/index.html")
 
 
 @app.on_event("startup")

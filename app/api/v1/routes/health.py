@@ -11,6 +11,6 @@ async def health_check():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 #根路由返回欢迎信息
-@router.get("/")
+@router.get("/root")
 async def root():
     return {"message": "Welcome to my AI Agent Project"}
