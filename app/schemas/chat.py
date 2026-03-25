@@ -20,3 +20,4 @@ class ChatResponse(BaseModel):
 class RAGSaveRequest(BaseModel):
     """RAG 保存请求模型"""
     text: str
+    source: str = "manual"

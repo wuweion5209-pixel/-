@@ -1,7 +1,7 @@
 """聊天相关路由"""
 import uuid
-from fastapi import APIRouter, HTTPException
-from app.services.agent_chains_db import add_knowledge_to_db
+from fastapi import APIRouter, HTTPException, UploadFile, File
+from app.services.agent_chains_db import add_knowledge_to_db, add_pdf_to_db
 from app.services.agent_service import agent_app
 from app.core.config import settings
 from app.schemas.chat import ChatRequest, ChatResponse, RAGSaveRequest
@@ -26,12 +26,30 @@ async def rag_save(request: RAGSaveRequest):
     """保存知识到向量数据库"""
     doc_id = str(uuid.uuid4())
     try:
-        await add_knowledge_to_db(text=request.text, doc_id=doc_id)
+        await add_knowledge_to_db(text=request.text, doc_id=doc_id, source=request.source)
         logger.info(f"知识存储成功: doc_id={doc_id}")
         return {"status": "success", "message": "数据已存储"}
     except Exception as e:
         logger.error(f"知识存储失败: {e}")
         return {"status": "error", "message": str(e)}
+
+
+@router.post("/upload_pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    """上传 PDF 文件到向量数据库"""
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="只支持 PDF 文件")
+    try:
+        file_bytes = await file.read()
+        page_count = await add_pdf_to_db(file_bytes=file_bytes, filename=file.filename)
+        logger.info(f"PDF 上传成功: {file.filename}，{page_count} 页")
+        return {"status": "success", "message": f"PDF 已存储，共 {page_count} 页"}
+    except ValueError as e:
+        logger.warning(f"PDF 解析无内容: {file.filename} - {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"PDF 上传失败: {file.filename} - {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/agent_response", response_model=ChatResponse)

@@ -263,7 +263,13 @@
     <div class="card">
       <h3>添加知识</h3>
       <textarea id="knowledge-input" placeholder="输入要添加到知识库的文本内容..."></textarea>
+      <input id="knowledge-source" type="text" placeholder="来源说明（可选，如：会议记录、产品文档）" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
       <button class="btn-primary" onclick="saveKnowledge()">添加到知识库</button>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+        <input type="file" id="pdf-input" accept=".pdf" style="flex:1;font-size:13px;">
+        <button class="btn-primary" onclick="uploadPDF()">上传 PDF</button>
+      </div>
+      <div id="pdf-status" style="font-size:12px;color:#666;margin-top:6px;"></div>
     </div>
 
     <!-- 知识库列表 -->
@@ -373,24 +379,51 @@
 
   async function saveKnowledge() {
     const input = document.getElementById('knowledge-input');
+    const sourceInput = document.getElementById('knowledge-source');
     const text = input.value.trim();
+    const source = sourceInput.value.trim() || 'manual';
     if (!text) { alert('请输入知识内容'); return; }
 
     try {
       const res = await fetch(`${API}/chat/ragsave`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, source })
       });
       const data = await res.json();
       if (data.status === 'success') {
         input.value = '';
+        sourceInput.value = '';
         loadKnowledge();
       } else {
         alert('添加失败：' + data.message);
       }
     } catch (e) {
       alert('网络错误：' + e.message);
+    }
+  }
+
+  async function uploadPDF() {
+    const input = document.getElementById('pdf-input');
+    const status = document.getElementById('pdf-status');
+    const file = input.files[0];
+    if (!file) { alert('请先选择 PDF 文件'); return; }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    status.textContent = '上传中...';
+    try {
+      const res = await fetch(`${API}/chat/upload_pdf`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        status.textContent = data.message;
+        input.value = '';
+        loadKnowledge();
+      } else {
+        status.textContent = '失败：' + data.detail;
+      }
+    } catch (e) {
+      status.textContent = '网络错误：' + e.message;
     }
   }
 

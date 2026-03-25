@@ -6,8 +6,34 @@ from app.models.message import Message
 from app.core.database import AsyncSessionLocal
 from app.core.config import llm
 from app.utils.logger import logger
+from pypdf import PdfReader
+import io
 # 1. 创建异步引擎 (注意：如果是 MySQL，URL 应为 mysql+aiomysql://...)
                                                       
+
+async def add_pdf_to_db(file_bytes: bytes, filename: str):
+    """解析 PDF 文件并存入向量数据库"""
+    reader = PdfReader(io.BytesIO(file_bytes))
+    texts = []
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text()
+        if text and text.strip():
+            texts.append((i + 1, text.strip()))
+
+    if not texts:
+        raise ValueError("PDF 中未提取到任何文本内容")
+
+    vector_store = get_vector_store()
+    for page_num, text in texts:
+        doc_id = str(uuid.uuid4())
+        vector_store.add_texts(
+            texts=[text],
+            ids=[doc_id],
+            metadatas=[{"source": filename, "page": page_num}]
+        )
+    logger.info(f"PDF 存储完成: {filename}，共 {len(texts)} 页")
+    return len(texts)
+
 
 # --- 异步数据库操作函数 ---
 
@@ -59,16 +85,15 @@ async def async_save_message(conv_id: str,user_id:str, user_input: str, ai_answe
         return final_conv_id  # 消息保存完成
         
 
-async def add_knowledge_to_db(text: str, doc_id: str):        
-   
-    vs = get_vector_store()                                  
-    
-    print(f"📢 正在向路径存储")                    
-    
-    # 2. 调用 LangChain 的存储方法，它内部处理了持久化逻辑
-    vs.add_texts(                                            
-        texts=[text],                                        
-        ids=[doc_id]                                         
+async def add_knowledge_to_db(text: str, doc_id: str, source: str = "manual"):
+
+    vs = get_vector_store()
+
+    # 调用 LangChain 的存储方法，附带 metadata
+    vs.add_texts(
+        texts=[text],
+        ids=[doc_id],
+        metadatas=[{"source": source}]
     )                                                        
 
     # 3. 校验逻辑：直接通过单例回查
