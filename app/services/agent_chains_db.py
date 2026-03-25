@@ -111,17 +111,17 @@ async def retrieve_context(query_text: str):
     vs = get_vector_store()
     keywords = _extract_keywords(query_text)
 
-    docs = vs.similarity_search_with_relevance_scores(query_text, k=5)
+    docs = vs.similarity_search_with_relevance_scores(query_text, k=10)
 
     final_docs = [
         (doc, score) for doc, score in docs
         if score >= 0.4 or any(k in doc.page_content for k in keywords)
     ]
 
-    logger.debug(f"原始检索到 {len(docs)} 条，过滤后剩余 {len(final_docs)} 条")
+    logger.info(f"原始检索到 {len(docs)} 条，过滤后剩余 {len(final_docs)} 条")
     for i, (doc, score) in enumerate(docs):
         status = "采用" if any(doc is d for d, _ in final_docs) else "舍弃"
-        logger.debug(f"[{i+1}] 分数: {score:.4f} | 状态: {status} | 来源: {doc.metadata.get('source', '未知')} | 内容: {doc.page_content[:20]}...")
+        logger.info(f"[{i+1}] 分数: {score:.4f} | 状态: {status} | 来源: {doc.metadata.get('source', '未知')} | 内容: {doc.page_content[:20]}...")
 
     if not final_docs:
         return "未找到足够相关的知识库内容。"
