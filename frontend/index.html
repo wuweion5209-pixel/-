@@ -369,7 +369,10 @@
         div.className = 'knowledge-item';
         const preview = item.content.length > 80 ? item.content.slice(0, 80) + '...' : item.content;
         const source = item.metadata?.source || '手动添加';
-        div.innerHTML = `<div>${preview}</div><div class="meta">来源：${source} | ID：${item.id.slice(0, 8)}...</div>`;
+        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div>${preview}<div class="meta">来源：${source} | ID：${item.id.slice(0, 8)}...</div></div>
+          <button onclick="deleteKnowledge('${item.id}', this)" style="flex-shrink:0;padding:2px 8px;font-size:11px;background:#ff4d4f;color:white;border:none;border-radius:4px;cursor:pointer;">删除</button>
+        </div>`;
         list.appendChild(div);
       });
     } catch (e) {
@@ -424,6 +427,23 @@
       }
     } catch (e) {
       status.textContent = '网络错误：' + e.message;
+    }
+  }
+
+  async function deleteKnowledge(id, btn) {
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/knowledge/delete/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.status === 'success') {
+        loadKnowledge();
+      } else {
+        alert('删除失败');
+        btn.disabled = false;
+      }
+    } catch (e) {
+      alert('网络错误：' + e.message);
+      btn.disabled = false;
     }
   }
 

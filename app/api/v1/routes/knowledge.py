@@ -26,6 +26,16 @@ async def list_knowledge():
     }
 
 
+@router.delete("/delete/{doc_id}")
+async def delete_knowledge(doc_id: str):
+    """删除单条知识"""
+    from app.core.vectorstore import get_vector_store
+    vector_store = get_vector_store()
+    vector_store.delete(ids=[doc_id])
+    logger.info(f"删除知识条目: {doc_id}")
+    return {"status": "success"}
+
+
 @router.delete("/clear")
 async def clear_knowledge():
     """清空知识库"""
