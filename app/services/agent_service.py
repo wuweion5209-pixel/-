@@ -5,6 +5,7 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode                      
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage 
 from app.core.config import llm
+from app.utils.logger import logger
        
 #定义向量检索工具
 @tool
@@ -74,7 +75,7 @@ def router_node(state:AgentState):
     curr_count=state.get("retrieval_count",0)
     if last_messages.tool_calls:
         if curr_count>=3:
-            print("已到达最大检索次数，强制结束")
+            logger.warning("已到达最大检索次数，强制结束")
             return "save"
         return "tools"
     return "save"

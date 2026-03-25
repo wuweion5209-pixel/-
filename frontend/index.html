@@ -311,7 +311,7 @@
     loadingDiv.textContent = '思考中';
 
     try {
-      const res = await fetch(`${API}/chat/agent_test`, {
+      const res = await fetch(`${API}/chat/agent_response`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text })

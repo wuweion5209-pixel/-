@@ -1,10 +1,11 @@
 import uuid
-from sqlalchemy import select                                  
+from sqlalchemy import select
 from datetime import datetime
 from app.core.vectorstore import get_vector_store
 from app.models.message import Message
 from app.core.database import AsyncSessionLocal
 from app.core.config import llm
+from app.utils.logger import logger
 # 1. 创建异步引擎 (注意：如果是 MySQL，URL 应为 mysql+aiomysql://...)
                                                       
 
@@ -112,10 +113,10 @@ async def retrieve_context(query_text: str):
             final_docs.append(doc)
 
     # 3. 调试日志
-    print(f"🔍 原始检索到 {len(docs)} 条，过滤后剩余 {len(final_docs)} 条") 
-    for i, (doc, score) in enumerate(docs):       
-        status="采用"if doc in final_docs else "舍弃"
-        print(f"   [{i+1}] 分数: {score:.4f} | 状态: {status} | 内容: {doc.page_content[:20]}...") 
+    logger.debug(f"原始检索到 {len(docs)} 条，过滤后剩余 {len(final_docs)} 条")
+    for i, (doc, score) in enumerate(docs):
+        status = "采用" if doc in final_docs else "舍弃"
+        logger.debug(f"[{i+1}] 分数: {score:.4f} | 状态: {status} | 内容: {doc.page_content[:20]}...") 
 
     if not final_docs:                                    
         return "未找到足够相关的知识库内容。"                    

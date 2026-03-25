@@ -1,5 +1,6 @@
 """知识库相关路由"""
 from fastapi import APIRouter
+from app.utils.logger import logger
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -10,15 +11,17 @@ async def list_knowledge():
     from app.core.vectorstore import get_vector_store
     vs = get_vector_store()
     all_data = vs.get()
+    total = len(all_data.get("ids", []))
+    logger.info(f"查询知识库，共 {total} 条")
     return {
-        "total": len(all_data.get("ids", [])),
+        "total": total,
         "items": [
             {
                 "id": all_data["ids"][i],
                 "content": all_data["documents"][i],
                 "metadata": all_data["metadatas"][i]
             }
-            for i in range(len(all_data.get("ids", [])))
+            for i in range(total)
         ]
     }
 
@@ -31,5 +34,7 @@ async def clear_knowledge():
     ids = vector_store.get().get("ids", [])
     if ids:
         vector_store.delete(ids=ids)
+        logger.info(f"知识库已清空，删除 {len(ids)} 条")
         return {"status": "success", "deleted_count": len(ids)}
+    logger.info("知识库本已为空，无需清空")
     return {"status": "success", "deleted_count": 0}
