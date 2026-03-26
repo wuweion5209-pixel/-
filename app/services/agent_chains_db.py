@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import select
+from sqlalchemy import delete, select, func
 from datetime import datetime
 from app.core.vectorstore import get_vector_store
 from app.models.message import Message
@@ -61,27 +61,27 @@ async def async_save_message(
     user_input: str,
     ai_answer: str
 ):
-    final_conv_id = conversation_id or str(uuid.uuid4())
     Now = datetime.now()
 
     async with AsyncSessionLocal() as session:
         user_message = Message(
             user_id=user_id,
-            conversation_id=final_conv_id,
+            conversation_id=conversation_id,
             role="user",
             content=user_input,
             created_at=Now
         )
         ai_message = Message(
             user_id=user_id,
-            conversation_id=final_conv_id,
+            conversation_id=conversation_id,
             role="assistant",
             content=ai_answer,
             created_at=Now
         )
         session.add_all([user_message, ai_message])
         await session.commit()
-        return final_conv_id
+        return conversation_id
+      
 
 
 async def add_knowledge_to_db(text: str, doc_id: str, source: str = "manual"):
@@ -133,3 +133,30 @@ async def retrieve_context(query_text: str):
         source_label = f"{source} 第{page}页" if page else source
         parts.append(f"[来源: {source_label}]\n{doc.page_content}")
     return "\n\n".join(parts)
+
+
+async def async_get_conversations(user_id: str):
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(Message.conversation_id, func.min(Message.created_at).label('created_at'))
+            .where(Message.user_id == user_id)
+            .group_by(Message.conversation_id)
+            .order_by(func.min(Message.created_at).desc())
+            .limit(20)
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+        return [
+            {"conversation_id": row.conversation_id, "created_at": row.created_at}
+            for row in rows
+        ]
+        
+        
+async def async_delete_conversation(conversation_id: str):
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            delete(Message)
+            .where(Message.conversation_id == conversation_id)
+        )
+        await session.execute(stmt)
+        await session.commit()

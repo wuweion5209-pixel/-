@@ -225,6 +225,58 @@
       margin-bottom: 8px;
     }
 
+    .conv-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-y: auto;
+      max-height: 180px;
+    }
+
+    .conv-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid #eee;
+      background: #fafafa;
+      transition: background 0.15s;
+    }
+    .conv-item:hover { background: #e8eaf0; }
+    .conv-item.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+    .conv-item .conv-id { font-family: monospace; }
+    .conv-item .conv-time { color: #aaa; font-size: 11px; }
+    .conv-item.active .conv-time { color: #ccc; }
+
+    .conv-input-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .conv-input-row input {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+    }
+    .conv-input-row input:focus { border-color: #1a1a2e; }
+    .conv-input-row button {
+      background: #1a1a2e;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .conv-input-row button:hover { background: #16213e; }
+
     .loading-dot::after {
       content: '';
       animation: dots 1.2s steps(3, end) infinite;
@@ -272,12 +324,26 @@
       <div id="pdf-status" style="font-size:12px;color:#666;margin-top:6px;"></div>
     </div>
 
-    <!-- 知识库列表 -->
-    <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+    <!-- 知识库内容 -->
+    <div class="card">
       <h3>知识库内容</h3>
-      <div class="knowledge-count" id="knowledge-count">加载中...</div>
-      <div class="knowledge-list" id="knowledge-list"></div>
-      <button class="btn-danger" onclick="clearKnowledge()">清空知识库</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <span class="knowledge-count" id="knowledge-count">加载中...</span>
+        <button class="btn-primary" onclick="toggleKnowledge()" id="toggle-kb-btn" style="font-size:12px;padding:3px 10px;">查看</button>
+      </div>
+      <div class="knowledge-list" id="knowledge-list" style="display:none;max-height:300px;overflow-y:auto;"></div>
+      <button class="btn-danger" id="clear-kb-btn" onclick="clearKnowledge()" style="display:none;margin-top:8px;">清空知识库</button>
+    </div>
+
+    <!-- 历史对话 -->
+    <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
+      <h3>历史对话</h3>
+      <div class="conv-input-row">
+        <input id="conv-id-input" type="text" placeholder="输入 Conversation ID 切换..." />
+        <button onclick="switchConversation()">切换</button>
+      </div>
+      <button class="btn-primary" style="margin-top:6px;" onclick="loadConversations()">刷新历史</button>
+      <div id="conv-list" style="margin-top:8px;overflow-y:auto;flex:1;"></div>
     </div>
 
   </div>
@@ -285,6 +351,10 @@
 
 <script>
   const API = 'http://localhost:8000';
+  let currentConversationId = localStorage.getItem('conversation_id') || null;
+  if (currentConversationId) {
+    document.getElementById('session-info').textContent = `当前会话：${currentConversationId.slice(0, 8)}...`;
+  }
 
   // ======== 聊天 ========
 
@@ -320,13 +390,17 @@
       const res = await fetch(`${API}/chat/agent_response`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({ message: text, conversation_id: currentConversationId })
       });
       const data = await res.json();
       loadingDiv.classList.remove('loading-dot');
       if (data.status === 'success') {
         loadingDiv.textContent = data.answer;
-        document.getElementById('session-info').textContent = `当前会话：${data.conversation_id.slice(0, 8)}...`;
+        if (data.conversation_id) {
+          currentConversationId = data.conversation_id;
+          localStorage.setItem('conversation_id', currentConversationId);
+          document.getElementById('session-info').textContent = `当前会话：${currentConversationId.slice(0, 8)}...`;
+        }
       } else {
         loadingDiv.textContent = '请求失败：' + JSON.stringify(data);
       }
@@ -338,27 +412,28 @@
     input.focus();
   }
 
-  async function newSession() {
-    try {
-      const res = await fetch(`${API}/chat/new_session`, { method: 'POST' });
-      const id = await res.json();
-      document.getElementById('session-info').textContent = `当前会话：${id.slice(0, 8)}...`;
-      document.getElementById('chat-messages').innerHTML = '';
-      appendMsg('system', '新对话已开始');
-    } catch (e) {
-      alert('创建会话失败：' + e.message);
-    }
+  function newSession() {
+    const id = prompt('请输入新对话的 Conversation ID：');
+    if (!id || !id.trim()) return;
+    const trimmed = id.trim();
+    currentConversationId = trimmed;
+    localStorage.setItem('conversation_id', currentConversationId);
+    document.getElementById('session-info').textContent = `当前会话：${trimmed.slice(0, 8)}...`;
+    document.getElementById('chat-messages').innerHTML = '';
+    appendMsg('system', `新对话已创建：${trimmed.slice(0, 8)}...`);
   }
 
   // ======== 知识库 ========
 
-  async function loadKnowledge() {
+  let knowledgeExpanded = false;
+
+  async function loadKnowledge(renderList = false) {
     try {
       const res = await fetch(`${API}/knowledge/list`);
       const data = await res.json();
+      document.getElementById('knowledge-count').textContent = `共 ${data.total} 条`;
+      if (!renderList) return;
       const list = document.getElementById('knowledge-list');
-      const count = document.getElementById('knowledge-count');
-      count.textContent = `共 ${data.total} 条`;
       list.innerHTML = '';
       if (data.total === 0) {
         list.innerHTML = '<div style="color:#aaa;font-size:12px;text-align:center;padding:12px;">知识库为空</div>';
@@ -380,6 +455,23 @@
     }
   }
 
+  function toggleKnowledge() {
+    knowledgeExpanded = !knowledgeExpanded;
+    const list = document.getElementById('knowledge-list');
+    const btn = document.getElementById('toggle-kb-btn');
+    const clearBtn = document.getElementById('clear-kb-btn');
+    if (knowledgeExpanded) {
+      list.style.display = 'block';
+      clearBtn.style.display = 'block';
+      btn.textContent = '收起';
+      loadKnowledge(true);
+    } else {
+      list.style.display = 'none';
+      clearBtn.style.display = 'none';
+      btn.textContent = '查看';
+    }
+  }
+
   async function saveKnowledge() {
     const input = document.getElementById('knowledge-input');
     const sourceInput = document.getElementById('knowledge-source');
@@ -397,7 +489,7 @@
       if (data.status === 'success') {
         input.value = '';
         sourceInput.value = '';
-        loadKnowledge();
+        loadKnowledge(knowledgeExpanded);
       } else {
         alert('添加失败：' + data.message);
       }
@@ -421,7 +513,7 @@
       if (res.ok) {
         status.textContent = data.message;
         input.value = '';
-        loadKnowledge();
+        loadKnowledge(knowledgeExpanded);
       } else {
         status.textContent = '失败：' + data.detail;
       }
@@ -436,7 +528,7 @@
       const res = await fetch(`${API}/knowledge/delete/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.status === 'success') {
-        loadKnowledge();
+        loadKnowledge(knowledgeExpanded);
       } else {
         alert('删除失败');
         btn.disabled = false;
@@ -453,14 +545,83 @@
       const res = await fetch(`${API}/knowledge/clear`, { method: 'DELETE' });
       const data = await res.json();
       alert(`已清空 ${data.deleted_count} 条记录`);
-      loadKnowledge();
+      loadKnowledge(false);
     } catch (e) {
       alert('清空失败：' + e.message);
     }
   }
 
+  // ======== 历史对话 ========
+  async function loadConversations() {
+    const list = document.getElementById('conv-list');
+    list.innerHTML = '<span style="color:#888;font-size:12px;">加载中...</span>';
+    try {
+      const res = await fetch(`${API}/chat/show_conversatios`);
+      const data = await res.json();
+      const convs = data.message || [];
+      if (convs.length === 0) {
+        list.innerHTML = '<span style="color:#888;font-size:12px;">暂无历史对话</span>';
+        return;
+      }
+      list.innerHTML = '';
+      convs.forEach(conv => {
+        const div = document.createElement('div');
+        div.style.cssText = 'padding:6px 8px;margin-bottom:4px;background:#f5f5f5;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center;';
+        const shortId = conv.conversation_id.slice(0, 8) + '...';
+        const date = new Date(conv.created_at).toLocaleString('zh-CN');
+        div.innerHTML = `<span style="font-family:monospace;cursor:pointer;flex:1;" onclick="switchToConv('${conv.conversation_id}','${shortId}')">${shortId}</span><span style="color:#888;margin:0 8px;">${date}</span><button onclick="deleteConversation('${conv.conversation_id}',this)" style="background:#e74c3c;color:white;border:none;border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;">删除</button>`;
+        list.appendChild(div);
+      });
+    } catch (e) {
+      list.innerHTML = '<span style="color:red;font-size:12px;">加载失败：' + e.message + '</span>';
+    }
+  }
+
+  function switchToConv(id, shortId) {
+    currentConversationId = id;
+    localStorage.setItem('conversation_id', currentConversationId);
+    document.getElementById('session-info').textContent = `当前会话：${shortId}`;
+    document.getElementById('conv-id-input').value = '';
+    appendMsg('system', `已切换到会话 ${shortId}`);
+  }
+
+  async function deleteConversation(id, btn) {
+    if (!confirm(`确认删除会话 ${id.slice(0, 8)}...？`)) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/chat/delete_conversation?conversation_id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.status === 'success') {
+        if (currentConversationId === id) {
+          currentConversationId = null;
+          localStorage.removeItem('conversation_id');
+          document.getElementById('session-info').textContent = '无当前会话';
+        }
+        loadConversations();
+      } else {
+        alert('删除失败');
+        btn.disabled = false;
+      }
+    } catch (e) {
+      alert('网络错误：' + e.message);
+      btn.disabled = false;
+    }
+  }
+
+  function switchConversation() {
+    const input = document.getElementById('conv-id-input');
+    const id = input.value.trim();
+    if (!id) { alert('请输入 Conversation ID'); return; }
+    currentConversationId = id;
+    localStorage.setItem('conversation_id', currentConversationId);
+    document.getElementById('session-info').textContent = `当前会话：${id.slice(0, 8)}...`;
+    input.value = '';
+    appendMsg('system', `已切换到会话 ${id.slice(0, 8)}...`);
+  }
+
   // 初始化
   loadKnowledge();
+  loadConversations();
 </script>
 
 </body>

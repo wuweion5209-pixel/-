@@ -7,6 +7,7 @@ from app.core.config import settings
 class ChatRequest(BaseModel):
     """聊天请求模型"""
     message: str
+    conversation_id: str
     user_id: str=settings.DEFAULT_USER_ID
 
 
