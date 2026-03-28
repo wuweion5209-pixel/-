@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.core.database import engine, Base
 from app.api.v1.routes import health_router, chat_router, knowledge_router
+import app.models.conversation_summary  # noqa: F401 — register model so create_all builds the table
 from app.utils.logger import logger
 
 # 创建 FastAPI 应用实例

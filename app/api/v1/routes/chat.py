@@ -50,12 +50,13 @@ async def chat_endpoint(request: ChatRequest):
         initial_state = {
             "input": request.message,
             "user_id": settings.DEFAULT_USER_ID,
-            "conversation_id": request.conversation_id,
-            "retrieval_count": 0,
-            "tool_used": False,
             "chat_history": [],
+            "summary": "",
+            "retrieval_count": 0,
             "messages": [],
-            "answer": ""
+            "answer": "",
+            "conversation_id": request.conversation_id,
+            "tool_used": False,
         }
 
         final_state = await agent_app.ainvoke(initial_state)

@@ -160,3 +160,93 @@ async def async_delete_conversation(conversation_id: str):
         )
         await session.execute(stmt)
         await session.commit()
+
+
+# --- 滚动摘要 ---
+
+SUMMARY_EVERY_N_ROUNDS = 5   # 每 N 轮（N 条 user+assistant 对）触发一次摘要更新
+SUMMARY_MAX_LENGTH = 500     # 摘要字符数超过此阈值时强制更新
+
+
+async def async_get_summary(conversation_id: str) -> str:
+    """返回会话现有摘要，不存在则返回空字符串"""
+    from app.models.conversation_summary import ConversationSummary
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(ConversationSummary.summary).where(
+                ConversationSummary.conversation_id == conversation_id
+            )
+        )
+        return result.scalar_one_or_none() or ""
+
+
+async def async_maybe_update_summary(conversation_id: str):
+    """检查消息总数，若达到触发条件则用 LLM 更新摘要"""
+    from app.models.conversation_summary import ConversationSummary
+    from langchain_core.messages import HumanMessage
+
+    async with AsyncSessionLocal() as session:
+        # 查当前消息总数
+        count_result = await session.execute(
+            select(func.count()).where(Message.conversation_id == conversation_id)
+        )
+        total = count_result.scalar()
+
+        # 取现有摘要
+
+        existing_summary = await async_get_summary(conversation_id)
+
+        # 触发条件：每 N 轮 或 摘要过长
+        trigger = SUMMARY_EVERY_N_ROUNDS * 2
+        round_trigger = total > 0 and total % trigger == 0
+        length_trigger = len(existing_summary) > SUMMARY_MAX_LENGTH
+        if not (round_trigger or length_trigger):
+            return
+
+        # 取最近 trigger 条消息
+        recent_result = await session.execute(
+            select(Message.role, Message.content)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.id.desc())
+            .limit(trigger)
+        )
+        recent_rows = list(reversed(recent_result.all()))
+
+    # 在 session 外调用 LLM，避免长时间占用连接
+    dialogue = "\n".join(
+        f"{r.role}: {r.content}" for r in recent_rows
+    )
+    prefix = f"当前摘要：\n{existing_summary}\n\n" if existing_summary else ""
+    prompt = (
+        f"{prefix}"
+        f"最新对话记录：\n{dialogue}\n\n"
+        "请用简洁的中文将以上内容整合，生成一份覆盖全部要点的更新摘要。只输出摘要本身，不要任何额外说明。"
+    )
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    new_summary = response.content.strip()
+
+    # 写回数据库（upsert）
+    async with AsyncSessionLocal() as session:
+        
+            # 重新 attach 到新 session
+        res = await session.execute(
+                select(ConversationSummary).where(
+                    ConversationSummary.conversation_id == conversation_id
+                )
+            )
+        existing_row=res.scalar_one_or_none()
+            
+        if existing_row:  # 基于数据库查询结果判断
+             existing_row.summary = new_summary
+             existing_row.message_count = total
+        else:
+        
+            session.add(
+                ConversationSummary(
+                    conversation_id=conversation_id,
+                    summary=new_summary,
+                    message_count=total,
+                )
+            )
+        await session.commit()
+    logger.info(f"[摘要] 会话 {conversation_id} 摘要已更新（共 {total} 条消息）")

@@ -1,6 +1,6 @@
 from typing import Annotated, TypedDict, List                           
 from langgraph.graph import StateGraph, END, add_messages                  
-from app.services.agent_chains_db import  async_get_history, async_save_message,retrieve_context
+from app.services.agent_chains_db import async_get_history, async_save_message, retrieve_context, async_get_summary, async_maybe_update_summary
 from langchain_core.tools import tool                        
 from langgraph.prebuilt import ToolNode                      
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage 
@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     input: str       # 用户输入内容
     user_id:str
     chat_history: List[dict]                                 # 从数据库捞出的历史
+    summary: str                                             # 历史对话的滚动摘要
     retrieval_count: int                                     #设置检索的次数
     messages: Annotated[list, add_messages]                  # 用于存放对话和toolmessage
     answer: str                                              # 模型生成的答案
@@ -32,10 +33,11 @@ class AgentState(TypedDict):
 
 # --- 定义异步节点 (Nodes) ---
 
-async def load_history_node(state: AgentState):              
+async def load_history_node(state: AgentState):
     # 调用你之前定义的异步 MySQL 查询函数
     history = await async_get_history(state["conversation_id"])
-    return {"chat_history": history, "retrieval_count": 0, "tool_used": False}                         
+    summary = await async_get_summary(state["conversation_id"])
+    return {"chat_history": history, "summary": summary, "retrieval_count": 0, "tool_used": False}                         
 
 async def generate_node(state: AgentState):                  
     # 拼接 Prompt：结合历史、背景和当前问题
@@ -49,11 +51,18 @@ async def generate_node(state: AgentState):
         原则 6：已经调用retrieve_konwledge工具获得相关信息时，不要立即停止检索，要检索足够多的相关信息。
         原则 7：当用户要求知道某个事或人物的所有信息时，必须结合历史记录和调用retrieve_konwledge工具，以确保获取足够多的信息。
     """)
-    hist_messages = [HumanMessage(content=m['content']) if m['role']=='user' else AIMessage(content=m['content']) for m in state["chat_history"]] 
+    hist_messages = [HumanMessage(content=m['content']) if m['role']=='user' else AIMessage(content=m['content']) for m in state["chat_history"]]
+
+    summary = state.get("summary", "")
+    if summary:
+        summary_msg = SystemMessage(content=f"以下是本次对话的历史摘要（供参考）：\n{summary}")
+        context_messages = [system_prompt, summary_msg] + hist_messages
+    else:
+        context_messages = [system_prompt] + hist_messages
 
     current_input = HumanMessage(content=state["input"])
 
-    response = await llm_with_tools.ainvoke([system_prompt]+hist_messages+[current_input]+state["messages"])
+    response = await llm_with_tools.ainvoke(context_messages + [current_input] + state["messages"])
     curr_count = state.get("retrieval_count", 0)
     tool_used = state.get("tool_used", False)
     if response.tool_calls:
@@ -70,6 +79,7 @@ async def save_node(state: AgentState):
         state["input"],
         answer
     )
+    await async_maybe_update_summary(real_id)
     return {"conversation_id": real_id, "answer": answer}  # 记忆持久化完成                                           
 
 def router_node(state:AgentState):
