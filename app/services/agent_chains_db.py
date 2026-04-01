@@ -84,6 +84,19 @@ async def async_save_message(
       
 
 
+async def save_episodic_fragment(conversation_id: str, fragment: str, metadata: dict):
+    """将对话片段写入情节记忆向量集合"""
+    vs = get_vector_store("episodic")
+    doc_id = str(uuid.uuid4())
+    full_metadata = {"conversation_id": conversation_id, **metadata}
+    vs.add_texts(
+        texts=[fragment],
+        ids=[doc_id],
+        metadatas=[full_metadata]
+    )
+    logger.info(f"[情节记忆] 已写入片段，conversation_id={conversation_id}")
+
+
 async def add_knowledge_to_db(text: str, doc_id: str, source: str = "manual"):
 
     vs = get_vector_store()
@@ -250,3 +263,12 @@ async def async_maybe_update_summary(conversation_id: str):
             )
         await session.commit()
     logger.info(f"[摘要] 会话 {conversation_id} 摘要已更新（共 {total} 条消息）")
+
+
+async def retrieve_episodic_memory(query: str, conversation_id: str, k: int = 3) -> str:
+    """从情节记忆集合中检索与当前会话相关的历史片段"""
+    vs = get_vector_store("episodic")
+    docs = vs.similarity_search(query, k=k, filter={"conversation_id": conversation_id})
+    if not docs:
+        return ""
+    return "\n\n".join(doc.page_content for doc in docs)

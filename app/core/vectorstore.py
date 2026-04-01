@@ -27,23 +27,22 @@ embeddings = SafeDashScopeEmbeddings(
 
 COLLECTION_NAME = "knowledge_base"
 
-# 全局单例 VectorStore 对象
-# ⚠️ 直接在这里初始化 LangChain 的 Chroma 对象，确保所有操作都基于同一个实例
-#通过这个函数可以得到唯一的chroma对象，通过这个对象可以实现对向量数据库的增删改查
-_vector_store = None
+# 多集合单例缓存，key 为 collection_name
+_vector_stores: dict = {}
 
-def get_vector_store():
+def get_vector_store(collection_name: str = "knowledge_base"):
     """
-    获取全局唯一的 LangChain Chroma 向量库实例
+    获取指定 collection 的 LangChain Chroma 向量库实例（单例复用）
+    支持集合：knowledge_base（外部知识库）、episodic（情节记忆）
     """
-    global _vector_store
-    if _vector_store is None:
-        _vector_store = Chroma(
+    global _vector_stores
+    if collection_name not in _vector_stores:
+        _vector_stores[collection_name] = Chroma(
             persist_directory=DB_PATH,
             embedding_function=embeddings,
-            collection_name=COLLECTION_NAME
+            collection_name=collection_name
         )
-    return _vector_store
+    return _vector_stores[collection_name]
 
 #此函数返回一个collection，这个collection是对应向量数据库的一个collection对象
 #通过这个collection也可以实现对向量数据库的增删改查，但是需要提前将需要操作的数据转化为向量

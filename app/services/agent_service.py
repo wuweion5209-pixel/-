@@ -1,6 +1,7 @@
 from typing import Annotated, TypedDict, List                           
 from langgraph.graph import StateGraph, END, add_messages                  
-from app.services.agent_chains_db import async_get_history, async_save_message, retrieve_context, async_get_summary, async_maybe_update_summary
+from app.services.agent_chains_db import async_get_history, async_save_message, retrieve_context, async_get_summary, async_maybe_update_summary, save_episodic_fragment
+from app.core.vectorstore import get_vector_store
 from langchain_core.tools import tool                        
 from langgraph.prebuilt import ToolNode                      
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage 
@@ -30,6 +31,19 @@ class AgentState(TypedDict):
     answer: str                                              # 模型生成的答案
     conversation_id: str  # 对话唯一标识
     tool_used: bool  # 是否实际调用过知识检索工具
+    episodic_memories: str  # 情节记忆检索结果
+
+_EPISODIC_TRIGGERS = ["之前", "上次", "记得", "说过"]
+
+
+async def retrieve_episodic_memory(query: str, conversation_id: str, k: int = 3) -> str:
+    """从情节记忆集合中检索与当前会话相关的历史片段"""
+    vs = get_vector_store("episodic")
+    docs = vs.similarity_search(query, k=k, filter={"conversation_id": conversation_id})
+    if not docs:
+        return ""
+    return "\n\n".join(doc.page_content for doc in docs)
+
 
 # --- 定义异步节点 (Nodes) ---
 
@@ -37,7 +51,14 @@ async def load_history_node(state: AgentState):
     # 调用你之前定义的异步 MySQL 查询函数
     history = await async_get_history(state["conversation_id"])
     summary = await async_get_summary(state["conversation_id"])
-    return {"chat_history": history, "summary": summary, "retrieval_count": 0, "tool_used": False}                         
+
+    episodic = ""
+    if any(kw in state["input"] for kw in _EPISODIC_TRIGGERS):
+        episodic = await retrieve_episodic_memory(state["input"], state["conversation_id"])
+        if episodic:
+            logger.info(f"[情节记忆] 检索到相关历史片段，conversation_id={state['conversation_id']}")
+
+    return {"chat_history": history, "summary": summary, "retrieval_count": 0, "tool_used": False, "episodic_memories": episodic}                         
 
 async def generate_node(state: AgentState):                  
     # 拼接 Prompt：结合历史、背景和当前问题
@@ -54,11 +75,14 @@ async def generate_node(state: AgentState):
     hist_messages = [HumanMessage(content=m['content']) if m['role']=='user' else AIMessage(content=m['content']) for m in state["chat_history"]]
 
     summary = state.get("summary", "")
+    episodic = state.get("episodic_memories", "")
+
+    context_messages = [system_prompt]
     if summary:
-        summary_msg = SystemMessage(content=f"以下是本次对话的历史摘要（供参考）：\n{summary}")
-        context_messages = [system_prompt, summary_msg] + hist_messages
-    else:
-        context_messages = [system_prompt] + hist_messages
+        context_messages.append(SystemMessage(content=f"以下是本次对话的历史摘要（供参考）：\n{summary}"))
+    if episodic:
+        context_messages.append(SystemMessage(content=f"以下是从历史对话中检索到的相关情节记忆（供参考）：\n{episodic}"))
+    context_messages += hist_messages
 
     current_input = HumanMessage(content=state["input"])
 
@@ -80,6 +104,11 @@ async def save_node(state: AgentState):
         answer
     )
     await async_maybe_update_summary(real_id)
+
+    # 每轮都保存对话片段到情节记忆向量库
+    dialogue_fragment = f"user: {state['input']}\nassistant: {answer}"
+    await save_episodic_fragment(real_id, dialogue_fragment, {})
+
     return {"conversation_id": real_id, "answer": answer}  # 记忆持久化完成                                           
 
 def router_node(state:AgentState):
