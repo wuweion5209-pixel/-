@@ -57,6 +57,7 @@ async def chat_endpoint(request: ChatRequest):
             "answer": "",
             "conversation_id": request.conversation_id,
             "tool_used": False,
+            "episodic_memories": ""
         }
 
         final_state = await agent_app.ainvoke(initial_state)

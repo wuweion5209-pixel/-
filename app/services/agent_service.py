@@ -1,6 +1,6 @@
 from typing import Annotated, TypedDict, List                           
 from langgraph.graph import StateGraph, END, add_messages                  
-from app.services.agent_chains_db import async_get_history, async_save_message, retrieve_context, async_get_summary, async_maybe_update_summary, save_episodic_fragment
+from app.services.agent_chains_db import async_get_history, async_save_message, retrieve_context, async_get_summary, async_maybe_update_summary, save_episodic_fragment, retrieve_episodic_memory
 from app.core.vectorstore import get_vector_store
 from langchain_core.tools import tool                        
 from langgraph.prebuilt import ToolNode                      
@@ -35,14 +35,6 @@ class AgentState(TypedDict):
 
 _EPISODIC_TRIGGERS = ["之前", "上次", "记得", "说过"]
 
-
-async def retrieve_episodic_memory(query: str, conversation_id: str, k: int = 3) -> str:
-    """从情节记忆集合中检索与当前会话相关的历史片段"""
-    vs = get_vector_store("episodic")
-    docs = vs.similarity_search(query, k=k, filter={"conversation_id": conversation_id})
-    if not docs:
-        return ""
-    return "\n\n".join(doc.page_content for doc in docs)
 
 
 # --- 定义异步节点 (Nodes) ---
