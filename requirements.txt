@@ -17,3 +17,9 @@ python-multipart
 pytest
 
 # RAG + Agent + FastAPI project dependencies
+
+# RAG 混合检索依赖
+rank-bm25
+jieba
+sentence-transformers
+torch

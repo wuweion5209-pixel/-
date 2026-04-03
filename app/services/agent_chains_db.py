@@ -6,6 +6,7 @@ from app.models.message import Message
 from app.core.database import AsyncSessionLocal
 from app.core.config import llm
 from app.utils.logger import logger
+from app.services.rag import hybrid_search
 from pypdf import PdfReader
 import io
 
@@ -120,31 +121,22 @@ def _extract_keywords(text: str) -> list[str]:
 
 
 async def retrieve_context(query_text: str):
+    """混合检索入口"""
+    # 调用混合检索（向量 + BM25 + RRF + 重排序）
+    docs = await hybrid_search(query_text)
 
-    vs = get_vector_store()
-    keywords = _extract_keywords(query_text)
-
-    docs = vs.similarity_search_with_relevance_scores(query_text, k=10)
-
-    final_docs = [
-        (doc, score) for doc, score in docs
-        if score >= 0.4 or any(k in doc.page_content for k in keywords)
-    ]
-
-    logger.info(f"原始检索到 {len(docs)} 条，过滤后剩余 {len(final_docs)} 条")
-    for i, (doc, score) in enumerate(docs):
-        status = "采用" if any(doc is d for d, _ in final_docs) else "舍弃"
-        logger.info(f"[{i+1}] 分数: {score:.4f} | 状态: {status} | 来源: {doc.metadata.get('source', '未知')} | 内容: {doc.page_content[:20]}...")
-
-    if not final_docs:
+    if not docs:
         return "未找到足够相关的知识库内容。"
 
+    # 格式化返回结果
     parts = []
-    for doc, _ in final_docs:
+    for doc in docs:
         source = doc.metadata.get('source', '未知来源')
         page = doc.metadata.get('page', '')
         source_label = f"{source} 第{page}页" if page else source
         parts.append(f"[来源: {source_label}]\n{doc.page_content}")
+
+    logger.info(f"[知识库检索] 返回 {len(docs)} 条相关文档")
     return "\n\n".join(parts)
 
 
