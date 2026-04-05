@@ -7,32 +7,53 @@ from app.core.database import AsyncSessionLocal
 from app.core.config import llm
 from app.utils.logger import logger
 from app.services.rag import hybrid_search
+from app.services.rag.config import rag_config
+from app.services.rag.chunker import get_chunker
 from pypdf import PdfReader
 import io
 
 
 async def add_pdf_to_db(file_bytes: bytes, filename: str):
-    """解析 PDF 文件并存入向量数据库"""
-    reader = PdfReader(io.BytesIO(file_bytes))
-    texts = []
-    for i, page in enumerate(reader.pages):
-        text = page.extract_text()
-        if text and text.strip():
-            texts.append((i + 1, text.strip()))
+    """解析 PDF 文件并存入向量数据库（分块存储）"""
+    # 获取分块器
+    chunker = get_chunker(
+        chunk_size=rag_config.chunk_size,
+        chunk_overlap=rag_config.chunk_overlap,
+        min_chunk_size=rag_config.min_chunk_size
+    )
 
-    if not texts:
-        raise ValueError("PDF 中未提取到任何文本内容")
+    reader = PdfReader(io.BytesIO(file_bytes))
+    total_chunks = 0
+    total_pages = 0
 
     vector_store = get_vector_store()
-    for page_num, text in texts:
-        doc_id = str(uuid.uuid4())
-        vector_store.add_texts(
-            texts=[text],
-            ids=[doc_id],
-            metadatas=[{"source": filename, "page": page_num}]
-        )
-    logger.info(f"PDF 存储完成: {filename}，共 {len(texts)} 页")
-    return len(texts)
+
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text()
+        if not text or not text.strip():
+            continue
+
+        total_pages += 1
+
+        # 对每页文本进行分块
+        chunks = chunker.chunk_text(text)
+
+        for chunk_idx, chunk_text in enumerate(chunks):
+            if chunk_text.strip():
+                doc_id = str(uuid.uuid4())
+                vector_store.add_texts(
+                    texts=[chunk_text],
+                    ids=[doc_id],
+                    metadatas=[{
+                        "source": filename,
+                        "page": i + 1,
+                        "chunk": chunk_idx + 1  # 该页的第几块
+                    }]
+                )
+                total_chunks += 1
+
+    logger.info(f"PDF 存储完成: {filename}，共 {total_pages} 页 → {total_chunks} 个块")
+    return total_pages
 
 
 # --- 异步数据库操作函数 ---
@@ -82,7 +103,7 @@ async def async_save_message(
         session.add_all([user_message, ai_message])
         await session.commit()
         return conversation_id
-      
+
 
 
 async def save_episodic_fragment(conversation_id: str, fragment: str, metadata: dict):
@@ -113,11 +134,6 @@ async def add_knowledge_to_db(text: str, doc_id: str, source: str = "manual"):
     else:
         logger.error(f"知识存储失败，ID: {doc_id}")
 
-
-def _extract_keywords(text: str) -> list[str]:
-    """使用 jieba 分词提取关键词"""
-    import jieba
-    return [w for w in jieba.cut(text) if len(w) > 1]
 
 
 async def retrieve_context(query_text: str):
@@ -155,8 +171,8 @@ async def async_get_conversations(user_id: str):
             {"conversation_id": row.conversation_id, "created_at": row.created_at}
             for row in rows
         ]
-        
-        
+            
+
 async def async_delete_conversation(conversation_id: str):
     async with AsyncSessionLocal() as session:
         stmt = (

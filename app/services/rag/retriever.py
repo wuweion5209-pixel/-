@@ -25,7 +25,8 @@ class HybridRetriever:
         1. 向量检索
         2. BM25 检索
         3. RRF 融合
-        4. 重排序（可选）
+        4. 查询扩展（如结果不足）
+        5. 重排序（可选）
 
         Args:
             query: 用户查询
@@ -56,7 +57,35 @@ class HybridRetriever:
         fused_results = self.fusion_retriever.fuse([vector_results, bm25_results])
         logger.info(f"[混合检索] RRF 融合后 {len(fused_results)} 条")
 
-        # 4. 重排序
+        # 4. 如果需要查询扩展（当检索结果少时）
+        if rag_config.query_expansion and len(fused_results) < 5:
+            logger.info(f"[混合检索] 检索结果较少，进行查询扩展...")
+            for kw in rag_config.expansion_keywords:
+                # 扩展查询
+                expanded_query = f"{query} {kw}"
+                # 额外检索
+                extra_vector = self.vector_retriever.search(
+                    query=expanded_query,
+                    k=5,
+                    similarity_threshold=0.2  # 更低的阈值
+                )
+                extra_bm25 = self.bm25_retriever.search(expanded_query, k=5)
+
+                if extra_vector or extra_bm25:
+                    extra_fused = self.fusion_retriever.fuse([extra_vector, extra_bm25])
+                    # 合并到主结果（去重）
+                    existing_texts = {t for t, _, _ in fused_results}
+                    added_count = 0
+                    for text, score, meta in extra_fused:
+                        if text not in existing_texts and len(fused_results) < rag_config.rerank_top_k:
+                            fused_results.append((text, score, meta))
+                            added_count += 1
+                    if added_count > 0:
+                        logger.info(f"[混合检索] 扩展关键词'{kw}'新增 {added_count} 条")
+
+            logger.info(f"[混合检索] 扩展后总计 {len(fused_results)} 条")
+
+        # 5. 重排序
         if rag_config.rerank_enabled:
             reranked_results = self.reranker.rerank(
                 query=query,

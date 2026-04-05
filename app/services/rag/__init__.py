@@ -6,6 +6,7 @@ from app.services.rag.vector_retriever import VectorRetriever, get_vector_retrie
 from app.services.rag.bm25_retriever import BM25Retriever, get_bm25_retriever
 from app.services.rag.fusion import FusionRetriever, get_fusion_retriever
 from app.services.rag.reranker import Reranker, get_reranker
+from app.services.rag.chunker import TextChunker, get_chunker
 
 __all__ = [
     # 主入口
@@ -24,4 +25,6 @@ __all__ = [
     "FusionRetriever",
     "get_reranker",
     "Reranker",
+    "get_chunker",
+    "TextChunker",
 ]

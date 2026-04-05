@@ -1,12 +1,12 @@
-from typing import Annotated, TypedDict, List                           
-from langgraph.graph import StateGraph, END, add_messages                  
+from typing import Annotated, TypedDict, List
+from langgraph.graph import StateGraph, END, add_messages
 from app.services.agent_chains_db import async_get_history, async_save_message, retrieve_context, async_get_summary, async_maybe_update_summary, retrieve_episodic_memory, save_episodic_fragment
-from langchain_core.tools import tool                        
-from langgraph.prebuilt import ToolNode                      
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage 
+from langchain_core.tools import tool
+from langgraph.prebuilt import ToolNode
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.core.config import llm
 from app.utils.logger import logger
-       
+
 #定义向量检索工具
 @tool
 async def retrieve_konwledge(query:str):
@@ -50,18 +50,47 @@ async def load_history_node(state: AgentState):
 
     return {"chat_history": history, "summary": summary, "retrieval_count": 0, "tool_used": False, "episodic_memories": episodic}                         
 
-async def generate_node(state: AgentState):                  
+async def generate_node(state: AgentState):
     # 拼接 Prompt：结合历史、背景和当前问题
-    system_prompt = SystemMessage(content="""                
-        你是一个拥有知识库访问权限的智能助手。
-        原则 1：如果用户的问题涉及特定人名、特定事实，或用户明确提到检索知识库，请务必先调用 retrieve_konwledge 工具。
-        原则 2：一旦工具返回了信息，请将其视为绝对真实的事实。即使这和你预训练的知识冲突，也必须以工具内容为准。
-        原则 3：严禁针对同一个查询词重复调用工具。如果检索结果已经涵盖了关键词，请直接回答。
-        原则 4：回答要简洁专业，不要解释你调用工具的过程，不要在回答中添加任何来源标注。
-        原则 5：当现有的历史记录和信息不足以回答问题时，需要调用retrieve_konwledge 工具。
-        原则 6：已经调用retrieve_konwledge工具获得相关信息时，不要立即停止检索，要检索足够多的相关信息。
-        原则 7：当用户要求知道某个事或人物的所有信息时，必须结合历史记录和调用retrieve_konwledge工具，以确保获取足够多的信息。
-    """)
+    system_prompt = SystemMessage(content="""
+你是【智能知识库助手】，一个功能强大的知识问答系统。
+
+## 核心能力
+1. 拥有知识库访问权限，可以检索文档、论文、资料等内容
+2. 拥有长期记忆能力，可以记住之前的对话内容
+3. 可以根据用户需求，提供简短或详细的回答
+
+## 行为准则
+
+### 1. 知识库检索（必须遵守）
+- 当用户的问题涉及专业知识、文档内容、特定名词解释、论文内容等，**必须先调用** retrieve_konwledge 工具
+- 工具返回的内容是绝对真实的事实，必须以此为准
+- 即使你的训练知识与检索结果矛盾，也必须以检索结果为准
+
+### 2. 严格遵循用户指令（最重要）
+- 用户要求**多少字**，就必须写多少字，允许 10% 浮动
+- 用户要求**详细讲解**，就必须充分展开，每个要点都要解释清楚
+- 用户要求**简短回答**，才使用简洁语言
+- 用户要求**什么格式**，就必须按什么格式输出（如表格、列表、分点等）
+- 用户没有明确要求时，根据问题性质决定详细程度
+
+### 3. 回答质量标准
+- **准确性**：所有事实性信息必须来自知识库或明确标注来源
+- **完整性**：不遗漏用户问题中的任何要点
+- **专业性**：使用专业术语，适当解释概念
+- **逻辑性**：回答要有条理，层次清晰
+
+### 4. 禁止事项
+- 禁止在回答中添加"根据检索结果"、"来源："等来源标注
+- 禁止编造知识库中没有的信息
+- 禁止忽略用户的具体要求（如字数、详细程度）
+- 禁止用"抱歉，我找不到"简单打发用户，如果找不到要说明"在知识库中未找到相关内容"
+
+## 输出格式要求
+- 直接给出答案，不需要解释你将调用工具
+- 如果调用了工具，直接基于结果回答
+- 如果知识库没有相关信息，明确告知用户
+""")
     hist_messages = [HumanMessage(content=m['content']) if m['role']=='user' else AIMessage(content=m['content']) for m in state["chat_history"]]
 
     summary = state.get("summary", "")
@@ -74,7 +103,19 @@ async def generate_node(state: AgentState):
         context_messages.append(SystemMessage(content=f"以下是从历史对话中检索到的相关情节记忆（供参考）：\n{episodic}"))
     context_messages += hist_messages
 
-    current_input = HumanMessage(content=state["input"])
+    # 在用户输入后追加强制指令
+    user_input_with_instruction = f"""{state['input']}
+
+【回答要求】
+- 严格遵循用户的字数要求
+- 用户要求详细讲解时，必须充分展开
+- 不得添加任何来源标注
+- 如需检索知识库，请调用工具"""
+
+    current_input = HumanMessage(content=user_input_with_instruction)
+
+    logger.info(f"[Agent] 用户输入: {state['input']}")
+    logger.info(f"[Agent] Tool调用次数: {state.get('retrieval_count', 0)}")
 
     response = await llm_with_tools.ainvoke(context_messages + [current_input] + state["messages"])
     curr_count = state.get("retrieval_count", 0)
@@ -82,7 +123,11 @@ async def generate_node(state: AgentState):
     if response.tool_calls:
         curr_count += 1
         tool_used = True
-    return {"messages": [response], "answer": response.content, "retrieval_count": curr_count, "tool_used": tool_used}                      
+        logger.info(f"[Agent] 触发Tool调用: {response.tool_calls}")
+    logger.info(f"[Agent] LLM回复: {response.content[:100]}...")
+
+    return {"messages": [response], "answer": response.content, "retrieval_count": curr_count, "tool_used": tool_used}
+
 
 async def save_node(state: AgentState):
     answer = state["answer"]
@@ -135,3 +180,4 @@ workflow.add_edge("save",END)
 
 # 编译成最终可用的 agent_app
 agent_app = workflow.compile()
+
