@@ -6,7 +6,35 @@ import re
 def extract_main_content(url: str) -> str:
     """
     抓取网页有效内容，清理噪音后返回主要内容
+    优先使用 Jina Reader API（支持 JavaScript 渲染），失败时回退到直接抓取
     """
+    # 优先使用 Jina Reader API
+    try:
+        jina_url = f"https://r.jina.ai/{url}"
+        response = requests.get(jina_url, timeout=20)
+        if response.status_code == 200:
+            text = response.text
+            if text:
+                # 清理 Markdown 标记
+                text = re.sub(r'!\[Image \d+\]\([^)]+\)', '', text)  # 删除图片
+                text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)  # 链接转文本
+                text = re.sub(r'#+ ', '', text)  # 删除标题标记
+                text = re.sub(r'\*+', '', text)  # 删除加粗斜体标记
+
+                # 清理多余空白
+                lines = [line.strip() for line in text.split('\n') if line.strip()]
+                cleaned_text = '\n'.join(lines)
+
+                max_length = 8000
+                if len(cleaned_text) > max_length:
+                    cleaned_text = cleaned_text[:max_length] + "\n...（内容过长，已截断）"
+
+                return cleaned_text
+    except Exception as e:
+        # Jina 失败，继续尝试直接抓取
+        pass
+
+    # 回退方案：直接抓取（适用于纯 HTML）
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
