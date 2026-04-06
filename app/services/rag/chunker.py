@@ -10,8 +10,8 @@ class TextChunker:
 
     def __init__(
         self,
-        chunk_size: int = 500,
-        chunk_overlap: int = 50,
+        chunk_size: int = 800,
+        chunk_overlap: int = 100,
         min_chunk_size: int = 100
     ):
         """
@@ -64,7 +64,7 @@ class TextChunker:
 
                 # 保留 overlap 部分
                 if self.chunk_overlap > 0:
-                    current_chunk = current_chunk[-self.chunk_overlap:] if len(current_chunk) > self.chunk_overlap else current_chunk
+                    current_chunk = current_chunk[-self.chunk_overlap:] if len(current_chunk) > self.chunk_overlap else current_chunk#这一步是为了保留当前块的最后 chunk_overlap 个字符，以便与下一个块重叠，保持上下文连续性。如果当前块的长度小于 chunk_overlap，则保留整个块作为重叠部分。
             else:
                 if current_chunk:
                     current_chunk += "\n"

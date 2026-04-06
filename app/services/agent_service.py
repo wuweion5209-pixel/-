@@ -1,11 +1,26 @@
 from typing import Annotated, TypedDict, List
 from langgraph.graph import StateGraph, END, add_messages
 from app.services.agent_chains_db import async_get_history, async_save_message, retrieve_context, async_get_summary, async_maybe_update_summary, retrieve_episodic_memory, save_episodic_fragment
+from app.services.web_fetch import extract_main_content
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.core.config import llm
 from app.utils.logger import logger
+
+
+@tool
+async def fetch_webpage(url: str):
+    """
+    这是一个网页抓取工具。当用户提供了具体的URL地址，想了解该网页的内容时，
+    调用此工具获取网页的有效文本内容。
+
+    参数:
+        url: 用户提供的网页链接，必须是完整的URL格式（如 https://example.com）
+    """
+    content = extract_main_content(url)
+    return content
+
 
 #定义向量检索工具
 @tool
@@ -16,8 +31,9 @@ async def retrieve_konwledge(query:str):
     """                                                                                 
     return await retrieve_context(query)
 
-tools=[retrieve_konwledge]
+tools=[retrieve_konwledge, fetch_webpage]
 llm_with_tools=llm.bind_tools(tools)
+
 
 # 1. 定义状态结构：这是节点间传递的数据包
 class AgentState(TypedDict):
@@ -25,7 +41,8 @@ class AgentState(TypedDict):
     user_id:str
     chat_history: List[dict]                                 # 从数据库捞出的历史
     summary: str                                             # 历史对话的滚动摘要
-    retrieval_count: int                                     #设置检索的次数
+    retrieval_count: int                                     # 向量检索的次数
+    web_fetch_count: int                                     # 网页抓取的次数
     messages: Annotated[list, add_messages]                  # 用于存放对话和toolmessage
     answer: str                                              # 模型生成的答案
     conversation_id: str  # 对话唯一标识
@@ -48,7 +65,7 @@ async def load_history_node(state: AgentState):
         if episodic:
             logger.info(f"[情节记忆] 检索到相关历史片段，conversation_id={state['conversation_id']}")
 
-    return {"chat_history": history, "summary": summary, "retrieval_count": 0, "tool_used": False, "episodic_memories": episodic}                         
+    return {"chat_history": history, "summary": summary, "retrieval_count": 0, "web_fetch_count": 0, "tool_used": False, "episodic_memories": episodic}                         
 
 async def generate_node(state: AgentState):
     # 拼接 Prompt：结合历史、背景和当前问题
@@ -59,10 +76,21 @@ async def generate_node(state: AgentState):
 1. 拥有知识库访问权限，可以检索文档、论文、资料等内容
 2. 拥有长期记忆能力，可以记住之前的对话内容
 3. 可以根据用户需求，提供简短或详细的回答
+4. 可以抓取网页内容，当用户给出URL时获取网页有效信息
 
 ## 行为准则
 
 ### 1. 知识库检索（必须遵守）
+- 当用户的问题涉及专业知识、文档内容、特定名词解释、论文内容等，**必须先调用** retrieve_konwledge 工具
+- 工具返回的内容是绝对真实的事实，必须以此为准
+- 即使你的训练知识与检索结果矛盾，也必须以检索结果为准
+
+### 2. 网页抓取
+- 当用户提供了具体的URL，想了解该网页的内容时，**必须调用** fetch_webpage 工具
+- 根据抓取到的内容回答用户问题
+- 如果抓取失败，明确告知用户
+
+### 3. 严格遵循用户指令（最重要）
 - 当用户的问题涉及专业知识、文档内容、特定名词解释、论文内容等，**必须先调用** retrieve_konwledge 工具
 - 工具返回的内容是绝对真实的事实，必须以此为准
 - 即使你的训练知识与检索结果矛盾，也必须以检索结果为准
@@ -115,18 +143,28 @@ async def generate_node(state: AgentState):
     current_input = HumanMessage(content=user_input_with_instruction)
 
     logger.info(f"[Agent] 用户输入: {state['input']}")
-    logger.info(f"[Agent] Tool调用次数: {state.get('retrieval_count', 0)}")
+    logger.info(f"[Agent] 向量检索次数: {state.get('retrieval_count', 0)}, 网页抓取次数: {state.get('web_fetch_count', 0)}")
 
     response = await llm_with_tools.ainvoke(context_messages + [current_input] + state["messages"])
-    curr_count = state.get("retrieval_count", 0)
+
+    # 分别统计两种工具的调用次数
+    curr_retrieval = state.get("retrieval_count", 0)
+    curr_web_fetch = state.get("web_fetch_count", 0)
     tool_used = state.get("tool_used", False)
+
     if response.tool_calls:
-        curr_count += 1
-        tool_used = True
-        logger.info(f"[Agent] 触发Tool调用: {response.tool_calls}")
+        for tc in response.tool_calls:
+            if tc.name == "retrieve_konwledge":
+                curr_retrieval += 1
+                tool_used = True
+                logger.info(f"[Agent] 触发向量检索工具: {tc.name}")
+            elif tc.name == "fetch_webpage":
+                curr_web_fetch += 1
+                logger.info(f"[Agent] 触发网页抓取工具: {tc.name}")
+
     logger.info(f"[Agent] LLM回复: {response.content[:100]}...")
 
-    return {"messages": [response], "answer": response.content, "retrieval_count": curr_count, "tool_used": tool_used}
+    return {"messages": [response], "answer": response.content, "retrieval_count": curr_retrieval, "web_fetch_count": curr_web_fetch, "tool_used": tool_used}
 
 
 async def save_node(state: AgentState):
@@ -147,11 +185,13 @@ async def save_node(state: AgentState):
     return {"conversation_id": real_id, "answer": answer}  # 记忆持久化完成                                           
 
 def router_node(state:AgentState):
-    last_messages=state["messages"][-1]
-    curr_count=state.get("retrieval_count",0)
+    last_messages = state["messages"][-1]
+    retrieval_count = state.get("retrieval_count", 0)
+
     if last_messages.tool_calls:
-        if curr_count>=3:
-            logger.warning("已到达最大检索次数，强制结束")
+        # 只限制向量检索次数，网页抓取不限制
+        if retrieval_count >= 3:
+            logger.warning("已到达最大向量检索次数，强制结束")
             return "save"
         return "tools"
     return "save"
