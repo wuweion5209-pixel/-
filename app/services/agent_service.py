@@ -154,13 +154,14 @@ async def generate_node(state: AgentState):
 
     if response.tool_calls:
         for tc in response.tool_calls:
-            if tc.name == "retrieve_konwledge":
+            tc_name = tc.get("name") or tc.get("function", {}).get("name", "")
+            if tc_name == "retrieve_konwledge":
                 curr_retrieval += 1
                 tool_used = True
-                logger.info(f"[Agent] 触发向量检索工具: {tc.name}")
-            elif tc.name == "fetch_webpage":
+                logger.info(f"[Agent] 触发向量检索工具: {tc_name}")
+            elif tc_name == "fetch_webpage":
                 curr_web_fetch += 1
-                logger.info(f"[Agent] 触发网页抓取工具: {tc.name}")
+                logger.info(f"[Agent] 触发网页抓取工具: {tc_name}")
 
     logger.info(f"[Agent] LLM回复: {response.content[:100]}...")
 
