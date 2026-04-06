@@ -9,7 +9,9 @@ def extract_main_content(url: str) -> str:
     """
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         }
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
@@ -24,20 +26,40 @@ def extract_main_content(url: str) -> str:
         main_content = (
             soup.find('article') or
             soup.find('main') or
-            soup.find('div', class_=re.compile(r'content|article|post|main', re.I)) or
-            soup.find('div', id=re.compile(r'content|article|post|main', re.I)) or
+            soup.find('section') or
+            soup.find('div', class_=re.compile(r'content|article|post|main|hero', re.I)) or
+            soup.find('div', id=re.compile(r'content|article|post|main|hero', re.I)) or
             soup.body
         )
 
-        if not main_content:
-            return ""
-
         # 提取文本
-        text = main_content.get_text(separator='\n', strip=True)
+        text = ""
+        if main_content:
+            text = main_content.get_text(separator='\n', strip=True)
+
+        # 如果内容太少，尝试从 meta 标签获取
+        if not text or len(text.strip()) < 100:
+            meta_parts = []
+            for meta in soup.find_all('meta'):
+                content = meta.get('content', '')
+                name = meta.get('name') or meta.get('property') or ''
+                # 过滤无意义的 meta
+                if content and len(content) > 20 and name not in [
+                    'viewport', 'format-detection', 'msvalidate.01',
+                    'google-site-verification', 'baidu-site-verification'
+                ] and not content.replace('-', '').replace(' ', '').isalnum():
+                    meta_parts.append(content)
+
+            if meta_parts:
+                text = "\n".join(meta_parts)
 
         # 清理：去除多余空白行
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         cleaned_text = '\n'.join(lines)
+
+        # 如果仍然是空的，返回提示
+        if not cleaned_text or len(cleaned_text) < 50:
+            return f"该网页 ({url}) 为单页应用(SPA)，内容通过 JavaScript 动态渲染，无法直接抓取。\n\n网页标题: {soup.title.text if soup.title else '无'}"
 
         # 限制长度，避免过长
         max_length = 8000
@@ -46,5 +68,9 @@ def extract_main_content(url: str) -> str:
 
         return cleaned_text
 
+    except requests.exceptions.Timeout:
+        return f"抓取超时: {url}"
+    except requests.exceptions.RequestException as e:
+        return f"抓取失败: {str(e)}"
     except Exception as e:
         return f"抓取失败: {str(e)}"
