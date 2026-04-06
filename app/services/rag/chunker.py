@@ -111,3 +111,4 @@ def get_chunker(
     if _chunker is None:
         _chunker = TextChunker(chunk_size, chunk_overlap, min_chunk_size)
     return _chunker
+
