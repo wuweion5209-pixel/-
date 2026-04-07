@@ -1,7 +1,7 @@
 """聊天相关路由"""
 import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from app.services.agent_chains_db import add_knowledge_to_db, add_pdf_to_db, async_delete_conversation, async_get_conversations
+from app.services.agent_chains_db import add_knowledge_to_db, add_pdf_to_db, add_docx_to_db, add_txt_to_db, async_delete_conversation, async_get_conversations
 from app.services.agent_service import agent_app
 from app.core.config import settings
 from app.schemas.chat import ChatRequest, ChatResponse, RAGSaveRequest
@@ -38,6 +38,42 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error(f"PDF 上传失败: {file.filename} - {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/upload_docx")
+async def upload_docx(file: UploadFile = File(...)):
+    """上传 Word 文档到向量数据库"""
+    if not file.filename.endswith((".docx", ".doc")):
+        raise HTTPException(status_code=400, detail="只支持 Word 文档 (.docx, .doc)")
+    try:
+        file_bytes = await file.read()
+        count = await add_docx_to_db(file_bytes=file_bytes, filename=file.filename)
+        logger.info(f"DOCX 上传成功: {file.filename}，{count} 段")
+        return {"status": "success", "message": f"Word 文档已存储，共 {count} 段"}
+    except ValueError as e:
+        logger.warning(f"DOCX 解析无内容: {file.filename} - {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"DOCX 上传失败: {file.filename} - {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/upload_txt")
+async def upload_txt(file: UploadFile = File(...)):
+    """上传 TXT 文件到向量数据库"""
+    if not file.filename.endswith(".txt"):
+        raise HTTPException(status_code=400, detail="只支持 TXT 文件")
+    try:
+        file_bytes = await file.read()
+        count = await add_txt_to_db(file_bytes=file_bytes, filename=file.filename)
+        logger.info(f"TXT 上传成功: {file.filename}，{count} 字符")
+        return {"status": "success", "message": f"TXT 已存储，共 {count} 字符"}
+    except ValueError as e:
+        logger.warning(f"TXT 解析无内容: {file.filename} - {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"TXT 上传失败: {file.filename} - {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

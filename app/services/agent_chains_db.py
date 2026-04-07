@@ -10,6 +10,7 @@ from app.services.rag import hybrid_search
 from app.services.rag.config import rag_config
 from app.services.rag.chunker import get_chunker
 from pypdf import PdfReader
+from docx import Document
 import io
 
 
@@ -54,6 +55,84 @@ async def add_pdf_to_db(file_bytes: bytes, filename: str):
 
     logger.info(f"PDF 存储完成: {filename}，共 {total_pages} 页 → {total_chunks} 个块")
     return total_pages
+
+
+async def add_docx_to_db(file_bytes: bytes, filename: str):
+    """解析 Word 文档并存入向量数据库（分块存储）"""
+    chunker = get_chunker(
+        chunk_size=rag_config.chunk_size,
+        chunk_overlap=rag_config.chunk_overlap,
+        min_chunk_size=rag_config.min_chunk_size
+    )
+
+    reader = Document(io.BytesIO(file_bytes))
+    total_chunks = 0
+    total_paragraphs = 0
+
+    vector_store = get_vector_store()
+
+    # 提取所有段落
+    full_text = "\n".join([p.text for p in reader.paragraphs if p.text.strip()])
+    total_paragraphs = len([p for p in reader.paragraphs if p.text.strip()])
+
+    if not full_text.strip():
+        raise ValueError(f"文档 {filename} 无有效内容")
+
+    # 分块
+    chunks = chunker.chunk_text(full_text)
+
+    for chunk_idx, chunk_text in enumerate(chunks):
+        if chunk_text.strip():
+            doc_id = str(uuid.uuid4())
+            vector_store.add_texts(
+                texts=[chunk_text],
+                ids=[doc_id],
+                metadatas=[{
+                    "source": filename,
+                    "type": "docx",
+                    "chunk": chunk_idx + 1
+                }]
+            )
+            total_chunks += 1
+
+    logger.info(f"DOCX 存储完成: {filename}，共 {total_paragraphs} 段 → {total_chunks} 个块")
+    return total_paragraphs
+
+
+async def add_txt_to_db(file_bytes: bytes, filename: str):
+    """解析 TXT 文件并存入向量数据库（分块存储）"""
+    chunker = get_chunker(
+        chunk_size=rag_config.chunk_size,
+        chunk_overlap=rag_config.chunk_overlap,
+        min_chunk_size=rag_config.min_chunk_size
+    )
+
+    text = file_bytes.decode("utf-8")
+    total_chars = len(text)
+
+    if not text.strip():
+        raise ValueError(f"文件 {filename} 无有效内容")
+
+    vector_store = get_vector_store()
+    chunks = chunker.chunk_text(text)
+    total_chunks = 0
+
+    for chunk_idx, chunk_text in enumerate(chunks):
+        if chunk_text.strip():
+            doc_id = str(uuid.uuid4())
+            vector_store.add_texts(
+                texts=[chunk_text],
+                ids=[doc_id],
+                metadatas=[{
+                    "source": filename,
+                    "type": "txt",
+                    "chunk": chunk_idx + 1
+                }]
+            )
+            total_chunks += 1
+
+    logger.info(f"TXT 存储完成: {filename}，共 {total_chars} 字符 → {total_chunks} 个块")
+    return total_chars
 
 
 # --- 异步数据库操作函数 ---
