@@ -321,7 +321,15 @@
         <input type="file" id="pdf-input" accept=".pdf" style="flex:1;font-size:13px;">
         <button class="btn-primary" onclick="uploadPDF()">上传 PDF</button>
       </div>
-      <div id="pdf-status" style="font-size:12px;color:#666;margin-top:6px;"></div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+        <input type="file" id="docx-input" accept=".docx,.doc" style="flex:1;font-size:13px;">
+        <button class="btn-primary" onclick="uploadDocx()">上传 Word</button>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+        <input type="file" id="txt-input" accept=".txt" style="flex:1;font-size:13px;">
+        <button class="btn-primary" onclick="uploadTxt()">上传 TXT</button>
+      </div>
+      <div id="upload-status" style="font-size:12px;color:#666;margin-top:6px;"></div>
     </div>
 
     <!-- 知识库内容 -->
@@ -500,7 +508,7 @@
 
   async function uploadPDF() {
     const input = document.getElementById('pdf-input');
-    const status = document.getElementById('pdf-status');
+    const status = document.getElementById('upload-status');
     const file = input.files[0];
     if (!file) { alert('请先选择 PDF 文件'); return; }
 
@@ -509,6 +517,54 @@
     status.textContent = '上传中...';
     try {
       const res = await fetch(`${API}/chat/upload_pdf`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        status.textContent = data.message;
+        input.value = '';
+        loadKnowledge(knowledgeExpanded);
+      } else {
+        status.textContent = '失败：' + data.detail;
+      }
+    } catch (e) {
+      status.textContent = '网络错误：' + e.message;
+    }
+  }
+
+  async function uploadDocx() {
+    const input = document.getElementById('docx-input');
+    const status = document.getElementById('upload-status');
+    const file = input.files[0];
+    if (!file) { alert('请先选择 Word 文档'); return; }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    status.textContent = '上传中...';
+    try {
+      const res = await fetch(`${API}/chat/upload_docx`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        status.textContent = data.message;
+        input.value = '';
+        loadKnowledge(knowledgeExpanded);
+      } else {
+        status.textContent = '失败：' + data.detail;
+      }
+    } catch (e) {
+      status.textContent = '网络错误：' + e.message;
+    }
+  }
+
+  async function uploadTxt() {
+    const input = document.getElementById('txt-input');
+    const status = document.getElementById('upload-status');
+    const file = input.files[0];
+    if (!file) { alert('请先选择 TXT 文件'); return; }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    status.textContent = '上传中...';
+    try {
+      const res = await fetch(`${API}/chat/upload_txt`, { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) {
         status.textContent = data.message;
