@@ -20,8 +20,8 @@ class RAGConfig(BaseModel):
     rerank_top_k: int = 20  # 重排序后保留数量
     rerank_model: str = "bge-reranker-base"
 
-    # 过滤阈值
-    similarity_threshold: float = 0.3  # 降低阈值，避免漏掉相关文档
+    # 过滤阈值（已转换为正数分数，越大越相似）
+    similarity_threshold: float = 0.1  # 向量检索阈值
     keyword_match_weight: float = 0.3
 
     # 查询扩展

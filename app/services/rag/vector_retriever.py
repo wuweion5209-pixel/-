@@ -3,6 +3,16 @@ from app.core.vectorstore import get_vector_store
 from app.utils.logger import logger
 
 
+def _cosine_distance_to_similarity(distance: float) -> float:
+    """将余弦距离转换为相似度分数（用于比较）
+    Chroma 返回余弦距离（负数，越接近0越好）
+    转换为正数后越大表示越相似
+    """
+    # 直接取负值，将负距离转为正分数用于比较
+    # 例如: -0.06 -> 0.06, -0.10 -> 0.10
+    return -distance
+
+
 class VectorRetriever:
     """向量检索器"""
 
@@ -31,12 +41,14 @@ class VectorRetriever:
         # 检索并返回相似度分数
         results = vs.similarity_search_with_relevance_scores(query, k=k)
 
-        # 转换为 (文本, 分数, 元数据) 格式
+        # 转换为 (文本, 分数, 元数据) 格式，并过滤低相似度结果
         output = []
-        for doc, score in results:
+        for doc, distance in results:
+            # 将距离转换为相似度 (Chroma 返回的是余弦距离)
+            similarity = _cosine_distance_to_similarity(distance)
             # 过滤低相似度结果
-            if score >= similarity_threshold:
-                output.append((doc.page_content, float(score), doc.metadata))
+            if similarity >= similarity_threshold:
+                output.append((doc.page_content, similarity, doc.metadata))
 
         logger.info(f"[向量检索] 返回 {len(output)} 条结果 (阈值={similarity_threshold})")
         return output
