@@ -3,369 +3,728 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Agent 对话系统</title>
+  <title>AI Agent 工作台</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: #f9fafb;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        color: #1e293b;
+        overflow: hidden;
+    }
 
     header {
-      background: #1a1a2e;
-      color: white;
-      padding: 14px 24px;
-      font-size: 18px;
-      font-weight: bold;
-      letter-spacing: 1px;
+        background: #ffffff;
+        color: #0f172a;
+        padding: 16px 28px;
+        font-size: 18px;
+        font-weight: 600;
+        border-bottom: 1px solid #e2e8f0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .tab-nav {
+        display: flex;
+        gap: 8px;
+    }
+
+    .tab-nav button {
+        padding: 8px 16px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        color: #64748b;
+        transition: all 0.2s;
+    }
+
+    .tab-nav button:hover {
+        background: #f1f5f9;
+    }
+
+    .tab-nav button.active {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
     }
 
     .main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-      gap: 12px;
-      padding: 12px;
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        padding: 20px 28px;
+        gap: 20px;
+        max-width: 1600px;
+        margin: 0 auto;
+        width: 100%;
     }
 
     /* ======== 聊天区 ======== */
     .chat-panel {
-      flex: 2;
-      display: flex;
-      flex-direction: column;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      overflow: hidden;
+        flex: 2.5;
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
     }
 
     .chat-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      border-bottom: 1px solid #eee;
-      background: #fafafa;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #ffffff;
     }
 
-    .chat-toolbar span { font-size: 14px; color: #555; }
+    .chat-toolbar span {
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 500;
+        background: #f1f5f9;
+        padding: 4px 10px;
+        border-radius: 20px;
+    }
 
     .chat-toolbar button {
-      background: #e74c3c;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 14px;
-      cursor: pointer;
-      font-size: 13px;
+        background: #ffffff;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 6px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s ease;
     }
-    .chat-toolbar button:hover { background: #c0392b; }
+
+    .chat-toolbar button:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+    }
 
     .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
     }
 
     .msg {
-      max-width: 75%;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 14px;
-      line-height: 1.6;
-      word-break: break-word;
+        max-width: 80%;
+        font-size: 15px;
+        line-height: 1.6;
+        word-break: break-word;
+        display: flex;
+        flex-direction: column;
     }
+
     .msg.user {
-      align-self: flex-end;
-      background: #1a1a2e;
-      color: white;
-      border-bottom-right-radius: 4px;
+        align-self: flex-end;
+        background: #f1f5f9;
+        color: #0f172a;
+        padding: 12px 18px;
+        border-radius: 16px 16px 4px 16px;
     }
+
     .msg.assistant {
-      align-self: flex-start;
-      background: #f1f3f4;
-      color: #222;
-      border-bottom-left-radius: 4px;
+        align-self: flex-start;
+        background: transparent;
+        color: #334155;
+        padding: 0 10px;
     }
+
     .msg.system {
-      align-self: center;
-      background: #fff3cd;
-      color: #856404;
-      font-size: 12px;
-      padding: 4px 12px;
-      border-radius: 20px;
+        align-self: center;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 12px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
     }
 
     .chat-input-area {
-      display: flex;
-      gap: 8px;
-      padding: 12px 16px;
-      border-top: 1px solid #eee;
-      background: #fafafa;
+        display: flex;
+        gap: 12px;
+        padding: 20px;
+        border-top: 1px solid #f1f5f9;
+        background: #ffffff;
     }
 
     .chat-input-area textarea {
-      flex: 1;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 14px;
-      resize: none;
-      height: 60px;
-      font-family: inherit;
-      outline: none;
+        flex: 1;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-size: 15px;
+        line-height: 1.5;
+        resize: none;
+        height: 64px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .chat-input-area textarea:focus { border-color: #1a1a2e; }
+
+    .chat-input-area textarea:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
 
     .chat-input-area button {
-      background: #1a1a2e;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 0 20px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background 0.2s;
-    }
-    .chat-input-area button:hover { background: #16213e; }
-    .chat-input-area button:disabled { background: #aaa; cursor: not-allowed; }
-
-    /* ======== 知识库区 ======== */
-    .knowledge-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      min-width: 280px;
+        background: #0f172a;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0 24px;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 500;
+        transition: all 0.2s;
     }
 
-    .card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 16px;
+    .chat-input-area button:hover {
+        background: #1e293b;
+        transform: translateY(-1px);
     }
 
-    .card h3 {
-      font-size: 14px;
-      font-weight: bold;
-      color: #333;
-      margin-bottom: 10px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #eee;
+    .chat-input-area button:disabled {
+        background: #cbd5e1;
+        cursor: not-allowed;
+        transform: none;
     }
 
-    .card textarea {
-      width: 100%;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 13px;
-      resize: vertical;
-      height: 80px;
-      font-family: inherit;
-      outline: none;
-      margin-bottom: 8px;
+    /* ======== 右侧子界面区 ======== */
+    .side-panel {
+        flex: 1;
+        min-width: 360px;
+        max-width: 480px;
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        display: flex;
+        flex-direction: column;
     }
-    .card textarea:focus { border-color: #1a1a2e; }
 
-    .btn-primary {
-      background: #1a1a2e;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 7px 16px;
-      cursor: pointer;
-      font-size: 13px;
-      width: 100%;
+    .panel-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
     }
-    .btn-primary:hover { background: #16213e; }
 
-    .btn-danger {
-      background: #e74c3c;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 7px 16px;
-      cursor: pointer;
-      font-size: 13px;
-      width: 100%;
-      margin-top: 8px;
+    .panel-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
     }
-    .btn-danger:hover { background: #c0392b; }
+
+    /* 知识录入界面 */
+    .input-group {
+        margin-bottom: 16px;
+    }
+
+    .input-group label {
+        display: block;
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 6px;
+        font-weight: 500;
+    }
+
+    .input-group textarea {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+        resize: vertical;
+        min-height: 100px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-group textarea:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .input-group input[type="text"] {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-group input[type="text"]:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .btn-save {
+        background: #0f172a;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        width: 100%;
+        margin-top: 12px;
+        transition: all 0.2s;
+    }
+
+    .btn-save:hover {
+        background: #1e293b;
+    }
+
+    .section-divider {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 20px 0;
+    }
+
+    .section-title {
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .file-upload-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .file-upload-row input[type="file"] {
+        flex: 1;
+        font-size: 12px;
+    }
+
+    .file-upload-row input[type="file"]::file-selector-button {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 4px 8px;
+        color: #334155;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .file-upload-row input[type="file"]::file-selector-button:hover {
+        background: #e2e8f0;
+    }
+
+    .btn-upload {
+        background: #f1f5f9;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: all 0.2s;
+    }
+
+    .btn-upload:hover {
+        background: #e2e8f0;
+    }
+
+    .upload-status {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 8px;
+    }
+
+    /* 知识管理界面 */
+    .kb-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .kb-count {
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .btn-clear-all {
+        background: #fef2f2;
+        color: #ef4444;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .btn-clear-all:hover {
+        background: #fee2e2;
+    }
 
     .knowledge-list {
-      flex: 1;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      max-height: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
     }
 
     .knowledge-item {
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 12px;
-      color: #444;
-      line-height: 1.5;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px;
+        transition: border-color 0.2s;
     }
 
-    .knowledge-item .meta {
-      font-size: 11px;
-      color: #999;
-      margin-top: 4px;
+    .knowledge-item:hover {
+        border-color: #cbd5e1;
     }
 
-    .knowledge-count {
-      font-size: 12px;
-      color: #888;
-      margin-bottom: 8px;
+    .knowledge-content {
+        font-size: 13px;
+        color: #334155;
+        line-height: 1.5;
+        margin-bottom: 8px;
+        word-break: break-word;
     }
 
+    .knowledge-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .knowledge-meta-info {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    .btn-delete-item {
+        background: #fef2f2;
+        color: #ef4444;
+        border: 1px solid #fecaca;
+        border-radius: 4px;
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 11px;
+        transition: all 0.2s;
+    }
+
+    .btn-delete-item:hover {
+        background: #fee2e2;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    /* 会话管理界面 */
     .conv-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      overflow-y: auto;
-      max-height: 180px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
     }
 
     .conv-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      border: 1px solid #eee;
-      background: #fafafa;
-      transition: background 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px;
+        border-radius: 10px;
+        background: #f8fafc;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
     }
-    .conv-item:hover { background: #e8eaf0; }
-    .conv-item.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
-    .conv-item .conv-id { font-family: monospace; }
-    .conv-item .conv-time { color: #aaa; font-size: 11px; }
-    .conv-item.active .conv-time { color: #ccc; }
 
-    .conv-input-row {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
+    .conv-item:hover {
+        background: #f1f5f9;
+        border-color: #e2e8f0;
     }
-    .conv-input-row input {
-      flex: 1;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      padding: 5px 8px;
-      font-size: 12px;
-      font-family: monospace;
-      outline: none;
-    }
-    .conv-input-row input:focus { border-color: #1a1a2e; }
-    .conv-input-row button {
-      background: #1a1a2e;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 5px 12px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .conv-input-row button:hover { background: #16213e; }
 
+    .conv-item.active {
+        background: #0f172a;
+        color: white;
+    }
+
+    .conv-item.active .conv-time {
+        color: #94a3b8;
+    }
+
+    .conv-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .conv-id {
+        font-size: 13px;
+        font-family: monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .conv-time {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+
+    .btn-delete-conv {
+        background: transparent;
+        color: #ef4444;
+        border: none;
+        border-radius: 4px;
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 11px;
+        transition: all 0.2s;
+        opacity: 0;
+    }
+
+    .conv-item:hover .btn-delete-conv {
+        opacity: 1;
+    }
+
+    .btn-delete-conv:hover {
+        background: #fef2f2;
+    }
+
+    .conv-item.active .btn-delete-conv {
+        color: #fca5a5;
+    }
+
+    .conv-refresh {
+        text-align: center;
+        margin-bottom: 16px;
+    }
+
+    .btn-refresh {
+        background: #f1f5f9;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .btn-refresh:hover {
+        background: #e2e8f0;
+    }
+
+    /* 加载动画 */
     .loading-dot::after {
-      content: '';
-      animation: dots 1.2s steps(3, end) infinite;
+        content: '';
+        animation: dots 1.2s steps(3, end) infinite;
     }
+
     @keyframes dots {
-      0%   { content: '.'; }
-      33%  { content: '..'; }
-      66%  { content: '...'; }
-      100% { content: ''; }
+        0%   { content: '.'; }
+        33%  { content: '..'; }
+        66%  { content: '...'; }
+        100% { content: ''; }
+    }
+
+    /* 滚动条美化 */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    /* 隐藏所有子界面 */
+    .panel-view {
+        display: none;
+    }
+
+    .panel-view.active {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
     }
   </style>
 </head>
 <body>
 
-<header>AI Agent 对话系统</header>
+<header>
+  <span>AI Agent 工作台</span>
+  <div class="tab-nav">
+    <button id="tab-knowledge-input" onclick="switchTab('knowledge-input')">知识录入</button>
+    <button id="tab-knowledge-manage" onclick="switchTab('knowledge-manage')">知识管理</button>
+    <button id="tab-conversation-manage" onclick="switchTab('conversation-manage')">会话管理</button>
+  </div>
+</header>
 
 <div class="main">
-
   <!-- 聊天区 -->
   <div class="chat-panel">
     <div class="chat-toolbar">
       <span id="session-info">当前会话：自动分配</span>
-      <button onclick="newSession()">+ 新建对话</button>
+      <button onclick="newSession()">新建对话</button>
     </div>
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-input-area">
-      <textarea id="chat-input" placeholder="输入消息，Ctrl+Enter 发送..." onkeydown="handleKey(event)"></textarea>
+      <textarea id="chat-input" placeholder="输入消息指令，使用 Ctrl+Enter 发送..." onkeydown="handleKey(event)"></textarea>
       <button id="send-btn" onclick="sendMessage()">发送</button>
     </div>
   </div>
 
-  <!-- 知识库区 -->
-  <div class="knowledge-panel">
+  <!-- 右侧子界面面板 -->
+  <div class="side-panel">
+    <!-- 知识录入界面 -->
+    <div id="view-knowledge-input" class="panel-view active">
+      <div class="panel-header">知识录入</div>
+      <div class="panel-content">
+        <div class="input-group">
+          <label>文本内容</label>
+          <textarea id="knowledge-input" placeholder="直接粘贴文本片段..."></textarea>
+        </div>
+        <div class="input-group">
+          <label>来源标记</label>
+          <input id="knowledge-source" type="text" placeholder="例如: 产品需求文档">
+        </div>
+        <button class="btn-save" onclick="saveKnowledge()">存入知识库</button>
 
-    <!-- 添加知识 -->
-    <div class="card">
-      <h3>添加知识</h3>
-      <textarea id="knowledge-input" placeholder="输入要添加到知识库的文本内容..."></textarea>
-      <input id="knowledge-source" type="text" placeholder="来源说明（可选，如：会议记录、产品文档）" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
-      <button class="btn-primary" onclick="saveKnowledge()">添加到知识库</button>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
-        <input type="file" id="pdf-input" accept=".pdf" style="flex:1;font-size:13px;">
-        <button class="btn-primary" onclick="uploadPDF()">上传 PDF</button>
+        <div style="margin-top: 16px; font-size: 12px; color: #64748b;">
+          <span id="kb-count-input">共 0 条</span>
+        </div>
+
+        <div class="section-divider"></div>
+        <div class="section-title">文件上传</div>
+
+        <div class="file-upload-row">
+          <input type="file" id="pdf-input" accept=".pdf">
+          <button class="btn-upload" onclick="uploadPDF()">导入 PDF</button>
+        </div>
+        <div class="file-upload-row">
+          <input type="file" id="docx-input" accept=".docx,.doc">
+          <button class="btn-upload" onclick="uploadDocx()">导入 Word</button>
+        </div>
+        <div class="file-upload-row">
+          <input type="file" id="txt-input" accept=".txt">
+          <button class="btn-upload" onclick="uploadTxt()">导入 TXT</button>
+        </div>
+        <div id="upload-status" class="upload-status"></div>
       </div>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
-        <input type="file" id="docx-input" accept=".docx,.doc" style="flex:1;font-size:13px;">
-        <button class="btn-primary" onclick="uploadDocx()">上传 Word</button>
-      </div>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
-        <input type="file" id="txt-input" accept=".txt" style="flex:1;font-size:13px;">
-        <button class="btn-primary" onclick="uploadTxt()">上传 TXT</button>
-      </div>
-      <div id="upload-status" style="font-size:12px;color:#666;margin-top:6px;"></div>
     </div>
 
-    <!-- 知识库内容 -->
-    <div class="card">
-      <h3>知识库内容</h3>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-        <span class="knowledge-count" id="knowledge-count">加载中...</span>
-        <button class="btn-primary" onclick="toggleKnowledge()" id="toggle-kb-btn" style="font-size:12px;padding:3px 10px;">查看</button>
+    <!-- 知识管理界面 -->
+    <div id="view-knowledge-manage" class="panel-view">
+      <div class="panel-header">知识管理</div>
+      <div class="panel-content">
+        <div class="kb-stats">
+          <span class="kb-count" id="kb-count">加载中...</span>
+          <button class="btn-clear-all" onclick="clearKnowledge()">清空全部</button>
+        </div>
+        <div class="knowledge-list" id="knowledge-list">
+          <div class="empty-state">暂无知识数据</div>
+        </div>
       </div>
-      <div class="knowledge-list" id="knowledge-list" style="display:none;max-height:300px;overflow-y:auto;"></div>
-      <button class="btn-danger" id="clear-kb-btn" onclick="clearKnowledge()" style="display:none;margin-top:8px;">清空知识库</button>
     </div>
 
-    <!-- 历史对话 -->
-    <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
-      <h3>历史对话</h3>
-      <div class="conv-input-row">
-        <input id="conv-id-input" type="text" placeholder="输入 Conversation ID 切换..." />
-        <button onclick="switchConversation()">切换</button>
+    <!-- 会话管理界面 -->
+    <div id="view-conversation-manage" class="panel-view">
+      <div class="panel-header">会话管理</div>
+      <div class="panel-content">
+        <div class="conv-refresh">
+          <button class="btn-refresh" onclick="loadConversations()">刷新列表</button>
+        </div>
+        <div class="conv-list" id="conv-list">
+          <div class="empty-state">暂无历史会话</div>
+        </div>
       </div>
-      <button class="btn-primary" style="margin-top:6px;" onclick="loadConversations()">刷新历史</button>
-      <div id="conv-list" style="margin-top:8px;overflow-y:auto;flex:1;"></div>
     </div>
-
   </div>
 </div>
 
 <script>
   const API = 'http://localhost:8000';
   let currentConversationId = localStorage.getItem('conversation_id') || null;
+  let currentTab = 'knowledge-input';
+
   if (currentConversationId) {
     document.getElementById('session-info').textContent = `当前会话：${currentConversationId.slice(0, 8)}...`;
   }
 
-  // ======== 聊天 ========
+  // 初始化选中第一个Tab
+  document.getElementById('tab-knowledge-input').classList.add('active');
 
+  // ======== Tab 切换 ========
+  function switchTab(tabName) {
+    // 隐藏所有视图
+    document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
+    // 取消所有按钮选中
+    document.querySelectorAll('.tab-nav button').forEach(el => el.classList.remove('active'));
+
+    // 显示选中视图
+    document.getElementById(`view-${tabName}`).classList.add('active');
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+
+    currentTab = tabName;
+
+    // 根据不同Tab执行初始化操作
+    if (tabName === 'knowledge-manage') {
+      loadKnowledgeList();
+    } else if (tabName === 'conversation-manage') {
+      loadConversations();
+    } else if (tabName === 'knowledge-input') {
+      loadKnowledgeCount();
+    }
+  }
+
+  // ======== 聊天 ========
   function handleKey(e) {
     if (e.ctrlKey && e.key === 'Enter') sendMessage();
   }
@@ -384,6 +743,7 @@
     const input = document.getElementById('chat-input');
     const btn = document.getElementById('send-btn');
     const text = input.value.trim();
+
     if (!text) return;
 
     input.value = '';
@@ -392,7 +752,7 @@
 
     const loadingDiv = appendMsg('assistant', '');
     loadingDiv.classList.add('loading-dot');
-    loadingDiv.textContent = '思考中';
+    loadingDiv.textContent = 'Agent 思考中';
 
     try {
       const res = await fetch(`${API}/chat/agent_response`, {
@@ -402,6 +762,7 @@
       });
       const data = await res.json();
       loadingDiv.classList.remove('loading-dot');
+
       if (data.status === 'success') {
         loadingDiv.textContent = data.answer;
         if (data.conversation_id) {
@@ -414,69 +775,41 @@
       }
     } catch (e) {
       loadingDiv.classList.remove('loading-dot');
-      loadingDiv.textContent = '网络错误：' + e.message;
+      loadingDiv.textContent = '网络异常，连接 Agent 失败：' + e.message;
     }
     btn.disabled = false;
     input.focus();
   }
 
   function newSession() {
-    const id = prompt('请输入新对话的 Conversation ID：');
+    const id = prompt('请输入新对话的 Conversation ID（留空取消）：');
     if (!id || !id.trim()) return;
+
     const trimmed = id.trim();
     currentConversationId = trimmed;
     localStorage.setItem('conversation_id', currentConversationId);
     document.getElementById('session-info').textContent = `当前会话：${trimmed.slice(0, 8)}...`;
     document.getElementById('chat-messages').innerHTML = '';
-    appendMsg('system', `新对话已创建：${trimmed.slice(0, 8)}...`);
+    appendMsg('system', `已为您开启新分支记录：${trimmed.slice(0, 8)}...`);
   }
 
-  // ======== 知识库 ========
-
-  let knowledgeExpanded = false;
-
-  async function loadKnowledge(renderList = false) {
+  // ======== 知识录入 ========
+  async function loadKnowledgeCount() {
     try {
       const res = await fetch(`${API}/knowledge/list`);
       const data = await res.json();
-      document.getElementById('knowledge-count').textContent = `共 ${data.total} 条`;
-      if (!renderList) return;
-      const list = document.getElementById('knowledge-list');
-      list.innerHTML = '';
-      if (data.total === 0) {
-        list.innerHTML = '<div style="color:#aaa;font-size:12px;text-align:center;padding:12px;">知识库为空</div>';
-        return;
+      // 更新知识录入界面的计数
+      const kbCountInput = document.getElementById('kb-count-input');
+      if (kbCountInput) {
+        kbCountInput.textContent = `共 ${data.total} 条`;
       }
-      data.items.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'knowledge-item';
-        const preview = item.content.length > 80 ? item.content.slice(0, 80) + '...' : item.content;
-        const source = item.metadata?.source || '手动添加';
-        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-          <div>${preview}<div class="meta">来源：${source} | ID：${item.id.slice(0, 8)}...</div></div>
-          <button onclick="deleteKnowledge('${item.id}', this)" style="flex-shrink:0;padding:2px 8px;font-size:11px;background:#ff4d4f;color:white;border:none;border-radius:4px;cursor:pointer;">删除</button>
-        </div>`;
-        list.appendChild(div);
-      });
+      // 更新知识管理界面的计数（如果存在）
+      const kbCountManage = document.getElementById('kb-count');
+      if (kbCountManage) {
+        kbCountManage.textContent = `共 ${data.total} 条`;
+      }
     } catch (e) {
-      document.getElementById('knowledge-count').textContent = '加载失败';
-    }
-  }
-
-  function toggleKnowledge() {
-    knowledgeExpanded = !knowledgeExpanded;
-    const list = document.getElementById('knowledge-list');
-    const btn = document.getElementById('toggle-kb-btn');
-    const clearBtn = document.getElementById('clear-kb-btn');
-    if (knowledgeExpanded) {
-      list.style.display = 'block';
-      clearBtn.style.display = 'block';
-      btn.textContent = '收起';
-      loadKnowledge(true);
-    } else {
-      list.style.display = 'none';
-      clearBtn.style.display = 'none';
-      btn.textContent = '查看';
+      // 静默失败，不影响用户体验
     }
   }
 
@@ -485,7 +818,8 @@
     const sourceInput = document.getElementById('knowledge-source');
     const text = input.value.trim();
     const source = sourceInput.value.trim() || 'manual';
-    if (!text) { alert('请输入知识内容'); return; }
+
+    if (!text) { alert('不允许存入空白知识'); return; }
 
     try {
       const res = await fetch(`${API}/chat/ragsave`, {
@@ -494,15 +828,16 @@
         body: JSON.stringify({ text, source })
       });
       const data = await res.json();
+
       if (data.status === 'success') {
         input.value = '';
         sourceInput.value = '';
-        loadKnowledge(knowledgeExpanded);
+        alert('知识录入成功');
       } else {
-        alert('添加失败：' + data.message);
+        alert('录入受挫：' + data.message);
       }
     } catch (e) {
-      alert('网络错误：' + e.message);
+      alert('网络不可用：' + e.message);
     }
   }
 
@@ -510,23 +845,23 @@
     const input = document.getElementById('pdf-input');
     const status = document.getElementById('upload-status');
     const file = input.files[0];
-    if (!file) { alert('请先选择 PDF 文件'); return; }
+    if (!file) { alert('尚未选择有效的 PDF 文档'); return; }
 
     const formData = new FormData();
     formData.append('file', file);
-    status.textContent = '上传中...';
+    status.textContent = '正在解析 PDF 文件...';
+
     try {
       const res = await fetch(`${API}/chat/upload_pdf`, { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) {
         status.textContent = data.message;
         input.value = '';
-        loadKnowledge(knowledgeExpanded);
       } else {
-        status.textContent = '失败：' + data.detail;
+        status.textContent = '处理中断：' + data.detail;
       }
     } catch (e) {
-      status.textContent = '网络错误：' + e.message;
+      status.textContent = '网络或跨域受阻：' + e.message;
     }
   }
 
@@ -534,23 +869,23 @@
     const input = document.getElementById('docx-input');
     const status = document.getElementById('upload-status');
     const file = input.files[0];
-    if (!file) { alert('请先选择 Word 文档'); return; }
+    if (!file) { alert('尚未定位到 Word 文档'); return; }
 
     const formData = new FormData();
     formData.append('file', file);
-    status.textContent = '上传中...';
+    status.textContent = '文档结构解析进行中...';
+
     try {
       const res = await fetch(`${API}/chat/upload_docx`, { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) {
         status.textContent = data.message;
         input.value = '';
-        loadKnowledge(knowledgeExpanded);
       } else {
-        status.textContent = '失败：' + data.detail;
+        status.textContent = '文件异常：' + data.detail;
       }
     } catch (e) {
-      status.textContent = '网络错误：' + e.message;
+      status.textContent = '连接后端引擎失败：' + e.message;
     }
   }
 
@@ -558,78 +893,129 @@
     const input = document.getElementById('txt-input');
     const status = document.getElementById('upload-status');
     const file = input.files[0];
-    if (!file) { alert('请先选择 TXT 文件'); return; }
+    if (!file) { alert('请选定合适的 TXT 后缀纯文本文件'); return; }
 
     const formData = new FormData();
     formData.append('file', file);
-    status.textContent = '上传中...';
+    status.textContent = '逐行读取 TXT 数据...';
+
     try {
       const res = await fetch(`${API}/chat/upload_txt`, { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) {
         status.textContent = data.message;
         input.value = '';
-        loadKnowledge(knowledgeExpanded);
       } else {
-        status.textContent = '失败：' + data.detail;
+        status.textContent = '载入受阻：' + data.detail;
       }
     } catch (e) {
-      status.textContent = '网络错误：' + e.message;
+      status.textContent = '网络信道中断：' + e.message;
     }
   }
 
-  async function deleteKnowledge(id, btn) {
-    btn.disabled = true;
+  // ======== 知识管理 ========
+  async function loadKnowledgeList() {
+    try {
+      const res = await fetch(`${API}/knowledge/list`);
+      const data = await res.json();
+
+      document.getElementById('kb-count').textContent = `共 ${data.total} 条`;
+
+      const list = document.getElementById('knowledge-list');
+      list.innerHTML = '';
+
+      if (data.total === 0) {
+        list.innerHTML = '<div class="empty-state">知识库空空如也</div>';
+        return;
+      }
+
+      data.items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'knowledge-item';
+        const preview = item.content.length > 100 ? item.content.slice(0, 100) + '...' : item.content;
+        const source = item.metadata?.source || '手动快捷录入';
+
+        div.innerHTML = `
+          <div class="knowledge-content">${preview}</div>
+          <div class="knowledge-meta">
+            <span class="knowledge-meta-info">来源：${source} | ID：${item.id.slice(0, 8)}...</span>
+            <button class="btn-delete-item" onclick="deleteKnowledge('${item.id}')">删除</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    } catch (e) {
+      document.getElementById('kb-count').textContent = '加载失败';
+    }
+  }
+
+  async function deleteKnowledge(id) {
+    if (!confirm('确认删除该知识条目？')) return;
     try {
       const res = await fetch(`${API}/knowledge/delete/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.status === 'success') {
-        loadKnowledge(knowledgeExpanded);
+        loadKnowledgeList();
       } else {
         alert('删除失败');
-        btn.disabled = false;
       }
     } catch (e) {
-      alert('网络错误：' + e.message);
-      btn.disabled = false;
+      alert('网络异常：' + e.message);
     }
   }
 
   async function clearKnowledge() {
-    if (!confirm('确认清空全部知识库内容？')) return;
+    if (!confirm('高度危险警告：此操作不可逆，确定清空全部知识吗？')) return;
     try {
       const res = await fetch(`${API}/knowledge/clear`, { method: 'DELETE' });
       const data = await res.json();
-      alert(`已清空 ${data.deleted_count} 条记录`);
-      loadKnowledge(false);
+      alert(`清除完毕，共计 ${data.deleted_count} 个条目`);
+      loadKnowledgeList();
     } catch (e) {
-      alert('清空失败：' + e.message);
+      alert('清除异常：' + e.message);
     }
   }
 
-  // ======== 历史对话 ========
+  // ======== 会话管理 ========
   async function loadConversations() {
     const list = document.getElementById('conv-list');
-    list.innerHTML = '<span style="color:#888;font-size:12px;">加载中...</span>';
+    list.innerHTML = '<div class="empty-state">努力搜寻记录中...</div>';
+
     try {
       const res = await fetch(`${API}/chat/show_conversatios`);
       const data = await res.json();
       const convs = data.message || [];
+
+      list.innerHTML = '';
+
       if (convs.length === 0) {
-        list.innerHTML = '<span style="color:#888;font-size:12px;">暂无历史对话</span>';
+        list.innerHTML = '<div class="empty-state">系统尚未产生任何历史记录</div>';
         return;
       }
-      list.innerHTML = '';
+
       convs.forEach(conv => {
         const div = document.createElement('div');
-        div.style.cssText = 'padding:6px 8px;margin-bottom:4px;background:#f5f5f5;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center;';
+        div.className = `conv-item ${currentConversationId === conv.conversation_id ? 'active' : ''}`;
         const shortId = conv.conversation_id.slice(0, 8) + '...';
         const date = new Date(conv.created_at).toLocaleString('zh-CN');
-        div.innerHTML = `<span style="font-family:monospace;cursor:pointer;flex:1;" onclick="switchToConv('${conv.conversation_id}','${shortId}')">${shortId}</span><span style="color:#888;margin:0 8px;">${date}</span><button onclick="deleteConversation('${conv.conversation_id}',this)" style="background:#e74c3c;color:white;border:none;border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;">删除</button>`;
+
+        div.innerHTML = `
+          <div class="conv-info">
+            <div class="conv-id">ID: ${shortId}</div>
+            <div class="conv-time">${date}</div>
+          </div>
+          <button class="btn-delete-conv" onclick="deleteConversation('${conv.conversation_id}', event)">删除</button>
+        `;
+
+        div.onclick = (e) => {
+          if (e.target.classList.contains('btn-delete-conv')) return;
+          switchToConv(conv.conversation_id, shortId);
+        };
+
         list.appendChild(div);
       });
     } catch (e) {
-      list.innerHTML = '<span style="color:red;font-size:12px;">加载失败：' + e.message + '</span>';
+      list.innerHTML = '<div class="empty-state">调取失败：' + e.message + '</div>';
     }
   }
 
@@ -637,47 +1023,37 @@
     currentConversationId = id;
     localStorage.setItem('conversation_id', currentConversationId);
     document.getElementById('session-info').textContent = `当前会话：${shortId}`;
-    document.getElementById('conv-id-input').value = '';
-    appendMsg('system', `已切换到会话 ${shortId}`);
+    appendMsg('system', `系统时空跳跃成功，已回溯至 ${shortId}`);
+
+    // 刷新列表以更新选中状态
+    loadConversations();
   }
 
-  async function deleteConversation(id, btn) {
-    if (!confirm(`确认删除会话 ${id.slice(0, 8)}...？`)) return;
-    btn.disabled = true;
+  async function deleteConversation(id, event) {
+    event.stopPropagation();
+    if (!confirm(`确认抹除 ${id.slice(0, 8)}... 的记忆？`)) return;
+
     try {
       const res = await fetch(`${API}/chat/delete_conversation?conversation_id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       const data = await res.json();
+
       if (data.status === 'success') {
         if (currentConversationId === id) {
           currentConversationId = null;
           localStorage.removeItem('conversation_id');
-          document.getElementById('session-info').textContent = '无当前会话';
+          document.getElementById('session-info').textContent = '当前会话：自动分配';
         }
         loadConversations();
       } else {
-        alert('删除失败');
-        btn.disabled = false;
+        alert('抹除失败');
       }
     } catch (e) {
-      alert('网络错误：' + e.message);
-      btn.disabled = false;
+      alert('通讯异常：' + e.message);
     }
   }
 
-  function switchConversation() {
-    const input = document.getElementById('conv-id-input');
-    const id = input.value.trim();
-    if (!id) { alert('请输入 Conversation ID'); return; }
-    currentConversationId = id;
-    localStorage.setItem('conversation_id', currentConversationId);
-    document.getElementById('session-info').textContent = `当前会话：${id.slice(0, 8)}...`;
-    input.value = '';
-    appendMsg('system', `已切换到会话 ${id.slice(0, 8)}...`);
-  }
-
   // 初始化
-  loadKnowledge();
-  loadConversations();
+  loadKnowledgeCount();
 </script>
 
 </body>

@@ -9,7 +9,7 @@ from app.utils.logger import logger
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-
+#普通存储，存储用户输入的文本
 @router.post("/ragsave")
 async def rag_save(request: RAGSaveRequest):
     """保存知识到向量数据库"""
@@ -22,7 +22,7 @@ async def rag_save(request: RAGSaveRequest):
         logger.error(f"知识存储失败: {e}")
         return {"status": "error", "message": str(e)}
 
-
+#存储pdf文件的接口，会自动解析pdf文件内容并存储到向量数据库中，支持多页pdf文件上传，并返回解析的页数信息。
 @router.post("/upload_pdf")
 async def upload_pdf(file: UploadFile = File(...)):
     """上传 PDF 文件到向量数据库"""
@@ -40,7 +40,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         logger.error(f"PDF 上传失败: {file.filename} - {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+#存储word文件的接口，会自动解析word文件内容并存储到向量数据库中，支持doc和docx格式的文件上传，并返回解析的段落数信息。
 @router.post("/upload_docx")
 async def upload_docx(file: UploadFile = File(...)):
     """上传 Word 文档到向量数据库"""
@@ -58,7 +58,7 @@ async def upload_docx(file: UploadFile = File(...)):
         logger.error(f"DOCX 上传失败: {file.filename} - {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+#存储txt文件的接口，会自动解析txt文件内容并存储到向量数据库中，并返回解析的字符数信息。
 @router.post("/upload_txt")
 async def upload_txt(file: UploadFile = File(...)):
     """上传 TXT 文件到向量数据库"""
@@ -76,7 +76,8 @@ async def upload_txt(file: UploadFile = File(...)):
         logger.error(f"TXT 上传失败: {file.filename} - {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+#聊天接口，接收用户输入的消息和会话ID，在此接口中接收用户输入的消息和会话ID
+#，然后构建初始state状态，调用agent_app.ainvoke方法执行agent逻辑，最后返回agent的回答和会话ID。
 @router.post("/agent_response", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """聊天接口"""
